@@ -23,12 +23,44 @@ body { font-family: 'Inter', sans-serif; }
 <div id="root"></div>
 
 <script type="text/babel">
-// Supabase 설정 (URL에서 /rest/v1/ 경로 자동 정제)
+// Supabase 설정
 const RAW_SUPABASE_URL = "https://ozflxmatleyttxwfrckb.supabase.co/rest/v1/";
 const SUPABASE_URL = RAW_SUPABASE_URL.replace(/\/rest\/v1\/?$/, "");
 const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96Zmx4bWF0bGV5dHR4d2ZyY2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDY5ODgsImV4cCI6MjEwMzIyMjk4OH0.S4hWR5krOBKlQNhGqe5phNxvyoy8E1H32WoODrC_5l0";
 
 const { useState, useMemo, useEffect, useCallback } = React;
+
+// 대한민국 주요 법정 공휴일 (양력 및 2024~2027 주요 음력 명절/대체휴일)
+const FIXED_HOLIDAYS = {
+  // 양력 반복 공휴일 (월-일)
+  "01-01": "신정",
+  "03-01": "삼일절",
+  "05-05": "어린이날",
+  "06-06": "현충일",
+  "08-15": "광복절",
+  "10-03": "개천절",
+  "10-09": "한글날",
+  "12-25": "성탄절",
+
+  // 2025년 명절 및 대체공휴일
+  "2025-01-28": "설날 연휴", "2025-01-29": "설날", "2025-01-30": "설날 연휴",
+  "2025-03-03": "대체공휴일(삼일절)", "2025-05-06": "대체공휴일(어린이날/부처님오신날)",
+  "2025-10-05": "추석 연휴", "2025-10-06": "추석", "2025-10-07": "추석 연휴", "2025-10-08": "대체공휴일",
+
+  // 2026년 명절 및 대체공휴일
+  "2026-02-16": "설날 연휴", "2026-02-17": "설날", "2026-02-18": "설날 연휴",
+  "2026-03-02": "대체공휴일(삼일절)", "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일",
+  "2026-08-17": "대체공휴일(광복절)",
+  "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴",
+  "2026-10-05": "대체공휴일(개천절)",
+
+  // 2027년 명절 및 대체공휴일
+  "2027-02-06": "설날 연휴", "2027-02-07": "설날", "2027-02-08": "설날 연휴", "2027-02-09": "대체공휴일",
+  "2027-05-13": "부처님오신날",
+  "2027-08-16": "대체공휴일(광복절)",
+  "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴",
+  "2027-10-04": "대체공휴일(개천절)", "2027-10-11": "대체공휴일(한글날)"
+};
 
 const ChevronLeft = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -144,21 +176,6 @@ function weekKeyOf(date) {
   return ymd(startOfWeekMon(date));
 }
 
-const todaySeed = new Date();
-const INITIAL_EVENTS = [];
-
-function buildInitialAdminWorkStatus() {
-  const key = weekKeyOf(todaySeed);
-  return {
-    [key]: {
-      "교장": "특이사항 없음",
-      "교감(교무)": "특이사항 없음",
-      "교감(생활)": "특이사항 없음",
-      "행정실장": "특이사항 없음"
-    }
-  };
-}
-
 function Badge({ className = "", children }) {
   return (
     <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-bold leading-none ${className}`}>
@@ -189,18 +206,43 @@ function FieldLabel({ children }) {
 
 const inputCls = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100 transition";
 
-function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent }) {
+// 휴일명 조회 헬퍼 함수 (법정공휴일 + 학교재량휴업일)
+function getHolidayName(dateStr, customHolidays) {
+  if (customHolidays && customHolidays[dateStr]) {
+    return customHolidays[dateStr];
+  }
+  if (FIXED_HOLIDAYS[dateStr]) {
+    return FIXED_HOLIDAYS[dateStr];
+  }
+  const mmdd = dateStr.slice(5);
+  if (FIXED_HOLIDAYS[mmdd]) {
+    return FIXED_HOLIDAYS[mmdd];
+  }
+  return null;
+}
+
+function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customHolidays }) {
   const dateStr = ymd(date);
   const dow = date.getDay();
   const isToday = sameDay(date, today);
-  const rowBg = isToday ? "bg-emerald-50/70" : dow === 0 ? "bg-rose-50/40" : dow === 6 ? "bg-blue-50/30" : "bg-white";
-  const dateColor = isToday ? "text-emerald-600" : dow === 0 ? "text-rose-400" : dow === 6 ? "text-blue-400" : "text-slate-500";
+  const holidayName = getHolidayName(dateStr, customHolidays);
+  const isHoliday = dow === 0 || !!holidayName;
+
+  const rowBg = isToday ? "bg-emerald-50/70" : isHoliday ? "bg-rose-50/40" : dow === 6 ? "bg-blue-50/30" : "bg-white";
+  const dateColor = isToday ? "text-emerald-600" : isHoliday ? "text-rose-500 font-black" : dow === 6 ? "text-blue-400" : "text-slate-500";
 
   return (
     <div className={`flex gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-4 ${rowBg} ${isLast ? "border-b-0" : ""}`}>
-      <div className={`flex w-14 shrink-0 items-start gap-1 pt-0.5 text-sm font-extrabold sm:w-16 ${dateColor}`}>
-        {date.getDate()}
-        <span className="text-xs font-bold">({WEEKDAY_KOR[dow]})</span>
+      <div className={`flex w-16 shrink-0 flex-col items-start pt-0.5 sm:w-20 ${dateColor}`}>
+        <div className="flex items-center gap-1 text-sm font-extrabold">
+          {date.getDate()}
+          <span className="text-xs font-bold">({WEEKDAY_KOR[dow]})</span>
+        </div>
+        {holidayName && (
+          <span className="mt-0.5 inline-block text-[10px] font-bold leading-tight text-rose-500 break-keep">
+            {holidayName}
+          </span>
+        )}
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
         {events.length === 0 ? (
@@ -258,7 +300,6 @@ function App() {
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [keyInput, setKeyInput] = useState("");
 
-  // 마스터 비밀번호 상태
   const [masterPassword, setMasterPassword] = useState(() => {
     return localStorage.getItem("sp_master_pw") || MASTER_PASSWORD_DEFAULT;
   });
@@ -269,8 +310,19 @@ function App() {
   const [masterPwError, setMasterPwError] = useState("");
   const [masterPwSuccess, setMasterPwSuccess] = useState("");
 
-  // 일정 복사(클립보드) 상태
   const [copiedEvent, setCopiedEvent] = useState(null);
+
+  // 학교 재량휴업일(맞춤 휴일) 상태
+  const [customHolidays, setCustomHolidays] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("sp_custom_holidays")) || {};
+    } catch { return {}; }
+  });
+  const [holidayModalStage, setHolidayModalStage] = useState(null);
+  const [holidayPwInput, setHolidayPwInput] = useState("");
+  const [holidayPwError, setHolidayPwError] = useState("");
+  const [newHolDate, setNewHolDate] = useState(ymd(today));
+  const [newHolName, setNewHolName] = useState("재량휴업일");
 
   const supabase = useMemo(() => {
     if (window.supabase && SUPABASE_URL && anonKey && anonKey !== "YOUR_SUPABASE_ANON_KEY_HERE") {
@@ -287,8 +339,8 @@ function App() {
   const [depts, setDepts] = useState(INITIAL_DEPTS);
   const [selectedDepts, setSelectedDepts] = useState(new Set(INITIAL_DEPTS));
   const [selectedGrades, setSelectedGrades] = useState(new Set(GRADES));
-  const [events, setEvents] = useState(INITIAL_EVENTS);
-  const [adminWorkStatus, setAdminWorkStatus] = useState(buildInitialAdminWorkStatus());
+  const [events, setEvents] = useState([]);
+  const [adminWorkStatus, setAdminWorkStatus] = useState({});
 
   const emptyForm = { date: ymd(today), dept: "", grade: "", content: "", password: "" };
   const [eventModal, setEventModal] = useState(null);
@@ -307,6 +359,7 @@ function App() {
   const [deptPwError, setDeptPwError] = useState("");
   const [deptEditRows, setDeptEditRows] = useState([]);
 
+  // DB에서 데이터 불러오기
   const fetchAllData = useCallback(async () => {
     if (!supabase) return;
     try {
@@ -318,14 +371,27 @@ function App() {
       if (dbDepts && dbDepts.length > 0) {
         const deptNames = dbDepts.map(d => d.name);
         setDepts(deptNames);
-        setSelectedDepts(new Set(deptNames));
+        setSelectedDepts(prevSelected => {
+          const next = new Set();
+          prevSelected.forEach(d => {
+            if (deptNames.includes(d)) next.add(d);
+          });
+          return next;
+        });
       }
     } catch(e) { console.error("Error fetching depts:", e); }
     try {
       const { data: dbAdmin } = await supabase.from('admin_status').select('*');
       if (dbAdmin) {
         const map = {};
-        dbAdmin.forEach(item => { map[item.week_key] = item.data; });
+        dbAdmin.forEach(item => {
+          if (item.week_key === 'custom_holidays_data') {
+            setCustomHolidays(item.data || {});
+            localStorage.setItem("sp_custom_holidays", JSON.stringify(item.data || {}));
+          } else {
+            map[item.week_key] = item.data;
+          }
+        });
         setAdminWorkStatus(map);
       }
     } catch(e) { console.error("Error fetching admin status:", e); }
@@ -390,7 +456,6 @@ function App() {
     else setWeekAnchor(new Date());
   };
 
-  // 일정 추가 모달 열기 (복사된 일정이 있을 경우 자동 채우기)
   const openAddEvent = (dateStr) => {
     if (copiedEvent) {
       setForm({
@@ -415,7 +480,6 @@ function App() {
     setEventModal({ mode: "edit", data: ev });
   };
 
-  // 일정 복사 함수
   const copyCurrentEvent = () => {
     if (!form.content.trim()) return;
     setCopiedEvent({
@@ -524,6 +588,41 @@ function App() {
       setTimeout(() => {
         setMasterPwModalOpen(false);
       }, 1200);
+    }
+  };
+
+  // 재량휴업일(맞춤 휴일) 모달 함수
+  const openHolidayModal = () => {
+    setHolidayPwInput("");
+    setHolidayPwError("");
+    setHolidayModalStage("password");
+  };
+
+  const submitHolidayPassword = () => {
+    if (holidayPwInput !== masterPassword) {
+      setHolidayPwError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setHolidayModalStage("edit");
+  };
+
+  const addCustomHoliday = async () => {
+    if (!newHolDate || !newHolName.trim()) return;
+    const updated = { ...customHolidays, [newHolDate]: newHolName.trim() };
+    setCustomHolidays(updated);
+    localStorage.setItem("sp_custom_holidays", JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: 'custom_holidays_data', data: updated }]);
+    }
+  };
+
+  const removeCustomHoliday = async (dateKey) => {
+    const updated = { ...customHolidays };
+    delete updated[dateKey];
+    setCustomHolidays(updated);
+    localStorage.setItem("sp_custom_holidays", JSON.stringify(updated));
+    if (supabase) {
+      await supabase.from('admin_status').upsert([{ week_key: 'custom_holidays_data', data: updated }]);
     }
   };
 
@@ -674,8 +773,15 @@ function App() {
           )}
         </div>
 
-        {/* 마스터 PW 변경 버튼 */}
-        <div className="mb-2 flex justify-end">
+        {/* 상단 우측 버튼군: 재량휴업일 관리 & 마스터 PW 변경 */}
+        <div className="mb-2 flex justify-end gap-2">
+          <button
+            onClick={openHolidayModal}
+            className="flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
+          >
+            <span>🏖️</span>
+            재량휴업일 관리
+          </button>
           <button
             onClick={openMasterPwModal}
             className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-white px-3.5 py-1 text-xs font-bold text-violet-600 hover:bg-violet-50 transition shadow-sm"
@@ -727,14 +833,32 @@ function App() {
         {tab === "month" ? (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
             {monthDays.map((d, idx) => (
-              <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === monthDays.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} />
+              <DateRow
+                key={ymd(d)}
+                date={d}
+                today={today}
+                events={eventsByDate[ymd(d)] || []}
+                isLast={idx === monthDays.length - 1}
+                onAddEvent={openAddEvent}
+                onOpenEvent={openEditEvent}
+                customHolidays={customHolidays}
+              />
             ))}
           </div>
         ) : (
           <>
             <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
               {weekDates.map((d, idx) => (
-                <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === weekDates.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} />
+                <DateRow
+                  key={ymd(d)}
+                  date={d}
+                  today={today}
+                  events={eventsByDate[ymd(d)] || []}
+                  isLast={idx === weekDates.length - 1}
+                  onAddEvent={openAddEvent}
+                  onOpenEvent={openEditEvent}
+                  customHolidays={customHolidays}
+                />
               ))}
             </div>
 
@@ -842,7 +966,92 @@ function App() {
           </Modal>
         )}
 
-        {/* 2. Supabase API Anon Key 모달 */}
+        {/* 2. 학교 재량휴업일(맞춤 휴일) 모달 */}
+        {holidayModalStage === "password" && (
+          <Modal title="재량휴업일 관리 인증" onClose={() => setHolidayModalStage(null)}>
+            <FieldLabel>마스터 비밀번호</FieldLabel>
+            <input
+              type="password"
+              autoFocus
+              value={holidayPwInput}
+              onChange={(e) => setHolidayPwInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitHolidayPassword()}
+              className={inputCls}
+              placeholder="마스터 비밀번호 입력"
+            />
+            {holidayPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{holidayPwError}</p>}
+            <button onClick={submitHolidayPassword} className="mt-4 w-full rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white hover:bg-rose-600 transition">
+              확인
+            </button>
+          </Modal>
+        )}
+
+        {holidayModalStage === "edit" && (
+          <Modal title="학교 재량휴업일 및 휴일 관리" onClose={() => setHolidayModalStage(null)} wide>
+            <div className="space-y-4">
+              <div className="rounded-xl bg-rose-50/60 p-3 border border-rose-100">
+                <p className="text-xs font-bold text-rose-700 mb-2">새 재량휴업일 등록</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="date"
+                    value={newHolDate}
+                    onChange={(e) => setNewHolDate(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-rose-400"
+                  />
+                  <input
+                    type="text"
+                    value={newHolName}
+                    onChange={(e) => setNewHolName(e.target.value)}
+                    placeholder="휴일 명칭 (예: 개교기념일)"
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-rose-400"
+                  />
+                  <button
+                    onClick={addCustomHoliday}
+                    className="rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-600 transition shrink-0"
+                  >
+                    추가
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-slate-500 mb-2">등록된 재량휴업일 목록</p>
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {Object.keys(customHolidays).length === 0 ? (
+                    <p className="text-xs text-slate-400 py-2 text-center">등록된 재량휴업일이 없습니다.</p>
+                  ) : (
+                    Object.entries(customHolidays).map(([dStr, name]) => (
+                      <div key={dStr} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-700">{dStr}</span>
+                          <span className="rounded bg-rose-100 text-rose-600 px-2 py-0.5 font-bold text-[11px]">{name}</span>
+                        </div>
+                        <button
+                          onClick={() => removeCustomHoliday(dStr)}
+                          className="text-slate-400 hover:text-rose-500 transition p-1"
+                          title="삭제"
+                        >
+                          <XIcon size={14} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => setHolidayModalStage(null)}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* 3. Supabase API Anon Key 모달 */}
         {keyModalOpen && (
           <Modal title="Supabase API Anon Key 설정" onClose={() => setKeyModalOpen(false)} wide>
             <div className="space-y-3">
@@ -861,7 +1070,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 3. 일정 추가/수정 모달 (복사 기능 탑재) */}
+        {/* 4. 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={closeEventModal} wide>
             <div className="space-y-3">
@@ -919,7 +1128,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 4. 관리자 근무 현황 인증 모달 */}
+        {/* 5. 관리자 근무 현황 인증 모달 */}
         {adminModalStage === "password" && (
           <Modal title="관리자 인증" onClose={closeAdminModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -930,7 +1139,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 5. 관리자 근무 현황 작성 모달 */}
+        {/* 6. 관리자 근무 현황 작성 모달 */}
         {adminModalStage === "edit" && (
           <Modal
             title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성 (${weekLabel})` : `관리자 근무 현황 작성 (${weekLabel})`}
@@ -958,7 +1167,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 6. 부서명 수정 인증 모달 */}
+        {/* 7. 부서명 수정 인증 모달 */}
         {deptModalStage === "password" && (
           <Modal title="마스터 인증" onClose={closeDeptModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -969,7 +1178,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 7. 부서명 수정 편집 모달 */}
+        {/* 8. 부서명 수정 편집 모달 */}
         {deptModalStage === "edit" && (
           <Modal title="담당 부서명 수정" onClose={closeDeptModal} wide>
             <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
