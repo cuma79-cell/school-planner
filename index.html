@@ -30,28 +30,17 @@ const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 const { useState, useMemo, useEffect, useCallback, useRef } = React;
 
 const FIXED_HOLIDAYS = {
-  "01-01": "신정",
-  "03-01": "삼일절",
-  "05-05": "어린이날",
-  "06-06": "현충일",
-  "08-15": "광복절",
-  "10-03": "개천절",
-  "10-09": "한글날",
-  "12-25": "성탄절",
-
+  "01-01": "신정", "03-01": "삼일절", "05-05": "어린이날", "06-06": "현충일",
+  "08-15": "광복절", "10-03": "개천절", "10-09": "한글날", "12-25": "성탄절",
   "2025-01-28": "설날 연휴", "2025-01-29": "설날", "2025-01-30": "설날 연휴",
-  "2025-03-03": "대체공휴일(삼일절)", "2025-05-06": "대체공휴일(어린이날/부처님오신날)",
+  "2025-03-03": "대체공휴일(삼일절)", "2025-05-06": "대체공휴일",
   "2025-10-05": "추석 연휴", "2025-10-06": "추석", "2025-10-07": "추석 연휴", "2025-10-08": "대체공휴일",
-
   "2026-02-16": "설날 연휴", "2026-02-17": "설날", "2026-02-18": "설날 연휴",
   "2026-03-02": "대체공휴일(삼일절)", "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일",
-  "2026-08-17": "대체공휴일(광복절)",
-  "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴",
-  "2026-10-05": "대체공휴일(개천절)",
-
+  "2026-08-17": "대체공휴일(광복절)", "2026-09-24": "추석 연휴", "2026-09-25": "추석",
+  "2026-09-26": "추석 연휴", "2026-10-05": "대체공휴일(개천절)",
   "2027-02-06": "설날 연휴", "2027-02-07": "설날", "2027-02-08": "설날 연휴", "2027-02-09": "대체공휴일",
-  "2027-05-13": "부처님오신날",
-  "2027-08-16": "대체공휴일(광복절)",
+  "2027-05-13": "부처님오신날", "2027-08-16": "대체공휴일(광복절)",
   "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴",
   "2027-10-04": "대체공휴일(개천절)", "2027-10-11": "대체공휴일(한글날)"
 };
@@ -79,6 +68,9 @@ const PrinterIcon = ({ size = 14, className = "" }) => (
 );
 const DownloadIcon = ({ size = 14, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+);
+const UploadCloudIcon = ({ size = 14, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
 );
 const LockIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -122,9 +114,7 @@ const PALETTE = [
 
 function hashStr(s) {
   let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  }
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
 }
 
@@ -141,22 +131,9 @@ function tagLabel(ev) {
 const pad2 = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const sameDay = (a, b) => ymd(a) === ymd(b);
-const addDays = (d, n) => {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-};
-const addMonths = (d, n) => {
-  const r = new Date(d);
-  r.setMonth(r.getMonth() + n);
-  return r;
-};
-const startOfWeekMon = (d) => {
-  const r = new Date(d);
-  const day = r.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  return addDays(r, diff);
-};
+const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+const addMonths = (d, n) => { const r = new Date(d); r.setMonth(r.getMonth() + n); return r; };
+const startOfWeekMon = (d) => { const r = new Date(d); const day = r.getDay(); const diff = day === 0 ? -6 : 1 - day; return addDays(r, diff); };
 
 function getMonthDays(viewDate) {
   const year = viewDate.getFullYear();
@@ -170,10 +147,6 @@ function getMonthDays(viewDate) {
 function getWeekdays(anchor) {
   const mon = startOfWeekMon(anchor);
   return [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
-}
-
-function weekKeyOf(date) {
-  return ymd(startOfWeekMon(date));
 }
 
 function Badge({ className = "", children }) {
@@ -207,17 +180,38 @@ function FieldLabel({ children }) {
 const inputCls = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100 transition";
 
 function getHolidayName(dateStr, customHolidays) {
-  if (customHolidays && customHolidays[dateStr]) {
-    return customHolidays[dateStr];
-  }
-  if (FIXED_HOLIDAYS[dateStr]) {
-    return FIXED_HOLIDAYS[dateStr];
-  }
+  if (customHolidays && customHolidays[dateStr]) return customHolidays[dateStr];
+  if (FIXED_HOLIDAYS[dateStr]) return FIXED_HOLIDAYS[dateStr];
   const mmdd = dateStr.slice(5);
-  if (FIXED_HOLIDAYS[mmdd]) {
-    return FIXED_HOLIDAYS[mmdd];
-  }
+  if (FIXED_HOLIDAYS[mmdd]) return FIXED_HOLIDAYS[mmdd];
   return null;
+}
+
+// CSV 파서 헬퍼 (따옴표 및 줄바꿈 지원)
+function parseCSV(text) {
+  const lines = text.split(/\r\n|\n/);
+  const result = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const row = [];
+    let insideQuotes = false;
+    let entry = '';
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      if (char === '"' || char === "'") {
+        insideQuotes = !insideQuotes;
+      } else if (char === ',' && !insideQuotes) {
+        row.push(entry.trim());
+        entry = '';
+      } else {
+        entry += char;
+      }
+    }
+    row.push(entry.trim());
+    result.push(row);
+  }
+  return result;
 }
 
 function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customHolidays }) {
@@ -299,9 +293,7 @@ function App() {
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [keyInput, setKeyInput] = useState("");
 
-  const [masterPassword, setMasterPassword] = useState(() => {
-    return localStorage.getItem("sp_master_pw") || MASTER_PASSWORD_DEFAULT;
-  });
+  const [masterPassword, setMasterPassword] = useState(() => localStorage.getItem("sp_master_pw") || MASTER_PASSWORD_DEFAULT);
   const [masterPwModalOpen, setMasterPwModalOpen] = useState(false);
   const [currentPwInput, setCurrentPwInput] = useState("");
   const [newPwInput, setNewPwInput] = useState("");
@@ -311,10 +303,14 @@ function App() {
 
   const [copiedEvent, setCopiedEvent] = useState(null);
 
+  // 엑셀 업로드 모달 상태
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadParsedEvents, setUploadParsedEvents] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const fileInputRef = useRef(null);
+
   const [customHolidays, setCustomHolidays] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("sp_custom_holidays")) || {};
-    } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem("sp_custom_holidays")) || {}; } catch { return {}; }
   });
   const [holidayModalStage, setHolidayModalStage] = useState(null);
   const [holidayPwInput, setHolidayPwInput] = useState("");
@@ -324,12 +320,7 @@ function App() {
 
   const supabase = useMemo(() => {
     if (window.supabase && SUPABASE_URL && anonKey && anonKey !== "YOUR_SUPABASE_ANON_KEY_HERE") {
-      try {
-        return window.supabase.createClient(SUPABASE_URL, anonKey);
-      } catch (err) {
-        console.error("Supabase client init error:", err);
-        return null;
-      }
+      try { return window.supabase.createClient(SUPABASE_URL, anonKey); } catch (err) { return null; }
     }
     return null;
   }, [anonKey]);
@@ -368,27 +359,24 @@ function App() {
     try {
       const { data: dbEvents } = await supabase.from('events').select('*');
       if (dbEvents) setEvents(dbEvents);
-    } catch(e) { console.error("Error fetching events:", e); }
+    } catch(e) {}
     try {
       const { data: dbDepts } = await supabase.from('depts').select('*').order('id', { ascending: true });
       if (dbDepts && dbDepts.length > 0) {
         const deptNames = dbDepts.map(d => d.name);
         setDepts(deptNames);
-        
         if (!isFirstDeptsLoadedRef.current) {
           setSelectedDepts(new Set(deptNames));
           isFirstDeptsLoadedRef.current = true;
         } else {
           setSelectedDepts(prevSelected => {
             const next = new Set();
-            prevSelected.forEach(d => {
-              if (deptNames.includes(d)) next.add(d);
-            });
+            prevSelected.forEach(d => { if (deptNames.includes(d)) next.add(d); });
             return next;
           });
         }
       }
-    } catch(e) { console.error("Error fetching depts:", e); }
+    } catch(e) {}
     try {
       const { data: dbAdmin } = await supabase.from('admin_status').select('*');
       if (dbAdmin) {
@@ -403,7 +391,7 @@ function App() {
         });
         setAdminWorkStatus(map);
       }
-    } catch(e) { console.error("Error fetching admin status:", e); }
+    } catch(e) {}
   }, [supabase]);
 
   useEffect(() => {
@@ -418,7 +406,6 @@ function App() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_status' }, () => fetchAllData())
         .subscribe();
     } catch (e) {}
-
     return () => {
       clearInterval(timer);
       if (channel) supabase.removeChannel(channel);
@@ -467,14 +454,101 @@ function App() {
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
-  // ==================== [인쇄 및 엑셀 다운로드 기능] ====================
-  // 1. 인쇄 (Print) 기능
+  // ==================== [엑셀 샘플 양식 다운로드 & 업로드 파싱] ====================
+  const handleDownloadSampleTemplate = () => {
+    const sampleRows = [
+      ["날짜(YYYY-MM-DD)", "담당부서", "학년", "행사내용", "비밀번호(4자리)"],
+      ["2026-10-01", "교무기획", "전체", "10월 개교기념일 행사(09:00~, 강당)", "1234"],
+      ["2026-10-02", "교육정보", "5학년", "디지털 새싹캠프(1~3교시, 컴퓨터실)", "1234"],
+      ["2026-10-07", "문화체육", "1학년", "유초이음 놀이수업(각 교실)", "1234"],
+      ["2026-10-15", "학생생활", "전체", "학교폭력예방 특별교육", "1234"]
+    ];
+    const csvString = sampleRows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "경연초_학사일정_업로드_양식.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        const rows = parseCSV(text);
+        if (rows.length <= 1) {
+          setUploadStatus("파일에 데이터가 없습니다.");
+          return;
+        }
+
+        const parsed = [];
+        // 첫 줄(헤더) 제외 후 파싱
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+          const rawDate = row[0] || "";
+          const dept = row[1] || "";
+          const grade = row[2] || "";
+          const content = row[3] || "";
+          const password = (row[4] || "1234").replace(/\D/g, "").slice(0, 4) || "1234";
+
+          // 날짜 유효성 정제 (2026-10-01 형식 맞춤)
+          let dateStr = rawDate.replace(/\./g, "-").replace(/\//g, "-").trim();
+          if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(dateStr)) {
+            const parts = dateStr.split("-");
+            dateStr = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+          }
+
+          if (dateStr && content.trim()) {
+            parsed.push({
+              id: Math.floor(Date.now() % 2147483647) + i,
+              date: dateStr,
+              dept: dept === "전체" ? "" : dept,
+              grade: grade === "전체" ? "" : grade,
+              content: content.trim(),
+              password: password
+            });
+          }
+        }
+
+        if (parsed.length === 0) {
+          setUploadStatus("유효한 일정 데이터를 찾을 수 없습니다. 양식을 확인해주세요.");
+        } else {
+          setUploadParsedEvents(parsed);
+          setUploadStatus(`총 ${parsed.length}개의 일정이 분석되었습니다. 아래 [DB에 일괄 등록] 버튼을 눌러주세요.`);
+        }
+      } catch (err) {
+        setUploadStatus("파일 읽기 오류: " + err.message);
+      }
+    };
+    reader.readAsText(file, "EUC-KR"); // 한국어 인코딩 호환
+  };
+
+  const handleConfirmUpload = async () => {
+    if (uploadParsedEvents.length === 0) return;
+    if (supabase) {
+      const { error } = await supabase.from('events').insert(uploadParsedEvents);
+      if (error) {
+        alert("DB 일괄 저장 실패: " + error.message);
+        return;
+      }
+    }
+    setEvents(prev => [...prev, ...uploadParsedEvents]);
+    alert(`총 ${uploadParsedEvents.length}개의 일정이 성공적으로 등록되었습니다!`);
+    setUploadModalOpen(false);
+    setUploadParsedEvents([]);
+    setUploadStatus("");
+  };
+
+  // ==================== [인쇄 및 엑셀 다운로드] ====================
   const handlePrint = () => {
     const isMonth = tab === "month";
-    const title = isMonth
-      ? `인천경연초등학교 ${monthLabel} 학사 일정표`
-      : `인천경연초등학교 주간 업무 및 근무 현황 (${weekLabel})`;
-
+    const title = isMonth ? `인천경연초등학교 ${monthLabel} 학사 일정표` : `인천경연초등학교 주간 업무 및 근무 현황 (${weekLabel})`;
     let contentHtml = "";
 
     if (isMonth) {
@@ -496,18 +570,14 @@ function App() {
               const evList = eventsByDate[dStr] || [];
               const isHoli = dow === 0 || !!hol;
               const colorStyle = isHoli ? "color:#e11d48; font-weight:bold;" : dow === 6 ? "color:#2563eb;" : "color:#334155;";
-              
-              const evText = evList.length === 0
-                ? '<span style="color:#cbd5e1;">-</span>'
-                : evList.map(ev => `
-                    <div style="margin-bottom:4px;">
-                      <span style="display:inline-block; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; font-size:11px; font-weight:bold; background:#f8fafc; margin-right:5px;">
-                        ${tagLabel(ev)}
-                      </span>
-                      <span>${ev.content}</span>
-                    </div>
-                  `).join("");
-
+              const evText = evList.length === 0 ? '<span style="color:#cbd5e1;">-</span>' : evList.map(ev => `
+                <div style="margin-bottom:4px;">
+                  <span style="display:inline-block; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; font-size:11px; font-weight:bold; background:#f8fafc; margin-right:5px;">
+                    ${tagLabel(ev)}
+                  </span>
+                  <span>${ev.content}</span>
+                </div>
+              `).join("");
               return `
                 <tr style="background-color:${isHoli ? '#fff1f2' : '#ffffff'};">
                   <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; ${colorStyle}">${dStr}</td>
@@ -540,18 +610,14 @@ function App() {
               const evList = eventsByDate[dStr] || [];
               const isHoli = dow === 0 || !!hol;
               const colorStyle = isHoli ? "color:#e11d48; font-weight:bold;" : "color:#334155;";
-
-              const evText = evList.length === 0
-                ? '<span style="color:#cbd5e1;">-</span>'
-                : evList.map(ev => `
-                    <div style="margin-bottom:4px;">
-                      <span style="display:inline-block; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; font-size:11px; font-weight:bold; background:#f8fafc; margin-right:5px;">
-                        ${tagLabel(ev)}
-                      </span>
-                      <span>${ev.content}</span>
-                    </div>
-                  `).join("");
-
+              const evText = evList.length === 0 ? '<span style="color:#cbd5e1;">-</span>' : evList.map(ev => `
+                <div style="margin-bottom:4px;">
+                  <span style="display:inline-block; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; font-size:11px; font-weight:bold; background:#f8fafc; margin-right:5px;">
+                    ${tagLabel(ev)}
+                  </span>
+                  <span>${ev.content}</span>
+                </div>
+              `).join("");
               return `
                 <tr style="background-color:${isHoli ? '#fff1f2' : '#ffffff'};">
                   <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; ${colorStyle}">${dStr}</td>
@@ -563,7 +629,6 @@ function App() {
             }).join("")}
           </tbody>
         </table>
-
         <h3 style="font-size:15px; font-weight:bold; margin-top:25px; color:#334155;">2. 관리자 주간 근무 현황</h3>
         <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;">
           <thead>
@@ -585,54 +650,35 @@ function App() {
     }
 
     const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert("팝업 차단을 해제해주세요.");
-      return;
-    }
-
+    if (!printWindow) { alert("팝업 차단을 해제해주세요."); return; }
     printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${title}</title>
-          <style>
-            @page { size: A4 portrait; margin: 15mm; }
-            body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; color: #1e293b; line-height: 1.5; margin:0; padding:10px; }
-            h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px 0; text-align: center; }
-            p.sub { font-size: 12px; color: #64748b; margin: 0 0 15px 0; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <h1>${title}</h1>
-          <p class="sub">인천경연초등학교 학사·근무 현황 플래너 (출력일시: ${new Date().toLocaleDateString('ko-KR')})</p>
-          ${contentHtml}
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          <\/script>
-        </body>
-      </html>
+      <!DOCTYPE html><html><head><title>${title}</title><style>
+        @page { size: A4 portrait; margin: 15mm; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; color: #1e293b; line-height: 1.5; margin:0; padding:10px; }
+        h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px 0; text-align: center; }
+        p.sub { font-size: 12px; color: #64748b; margin: 0 0 15px 0; text-align: center; }
+      </style></head><body>
+        <h1>${title}</h1>
+        <p class="sub">인천경연초등학교 학사·근무 현황 플래너 (출력일시: ${new Date().toLocaleDateString('ko-KR')})</p>
+        ${contentHtml}
+        <script>window.onload = function() { window.print(); };<\/script>
+      </body></html>
     `);
     printWindow.document.close();
   };
 
-  // 2. 엑셀/스프레드시트 CSV 다운로드 기능
   const handleDownloadExcel = () => {
     const isMonth = tab === "month";
     let csvRows = [];
-
     if (isMonth) {
       csvRows.push([`인천경연초등학교 ${monthLabel} 학사 일정표`]);
       csvRows.push([]);
       csvRows.push(["날짜", "요일", "휴일/구분", "담당부서", "학년", "행사 내용"]);
-
       monthDays.forEach(d => {
         const dStr = ymd(d);
         const dowStr = `${WEEKDAY_KOR[d.getDay()]}요일`;
         const hol = getHolidayName(dStr, customHolidays) || "";
         const evList = eventsByDate[dStr] || [];
-
         if (evList.length === 0) {
           csvRows.push([dStr, dowStr, hol, "", "", "-"]);
         } else {
@@ -646,13 +692,11 @@ function App() {
       csvRows.push([]);
       csvRows.push(["[1. 주간 학사 및 주요 행사]"]);
       csvRows.push(["날짜", "요일", "휴일/구분", "담당부서", "학년", "행사 내용"]);
-
       weekDates.forEach(d => {
         const dStr = ymd(d);
         const dowStr = `${WEEKDAY_KOR[d.getDay()]}요일`;
         const hol = getHolidayName(dStr, customHolidays) || "";
         const evList = eventsByDate[dStr] || [];
-
         if (evList.length === 0) {
           csvRows.push([dStr, dowStr, hol, "", "", "-"]);
         } else {
@@ -661,33 +705,20 @@ function App() {
           });
         }
       });
-
       csvRows.push([]);
       csvRows.push(["[2. 관리자 주간 근무 현황]"]);
       csvRows.push(["직책", "근무 및 출장 내용"]);
-      ADMIN_ROLES.forEach(r => {
-        csvRows.push([r, currentWeekTexts[r] || "특이사항 없음"]);
-      });
+      ADMIN_ROLES.forEach(r => { csvRows.push([r, currentWeekTexts[r] || "특이사항 없음"]); });
     }
 
-    // CSV 포맷 변환 (쉼표, 따옴표, 줄바꿈 안전 처리)
-    const csvString = csvRows.map(row => 
-      row.map(cell => {
-        const cStr = String(cell ?? "");
-        if (cStr.includes(",") || cStr.includes('"') || cStr.includes("\n")) {
-          return `"${cStr.replace(/"/g, '""')}"`;
-        }
-        return cStr;
-      }).join(",")
-    ).join("\r\n");
+    const csvString = csvRows.map(row => row.map(cell => {
+      const cStr = String(cell ?? "");
+      return (cStr.includes(",") || cStr.includes('"') || cStr.includes("\n")) ? `"${cStr.replace(/"/g, '""')}"` : cStr;
+    }).join(",")).join("\r\n");
 
-    // UTF-8 BOM 추가 (Excel에서 한글 깨짐 완전 방지)
     const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
-    const fileName = isMonth
-      ? `인천경연초_학사일정_${viewDate.getFullYear()}년_${viewDate.getMonth() + 1}월.csv`
-      : `인천경연초_주간업무현황_${weekLabel.replace(/[\/\s~]/g, "_")}.csv`;
-
+    const fileName = isMonth ? `인천경연초_학사일정_${viewDate.getFullYear()}년_${viewDate.getMonth() + 1}월.csv` : `인천경연초_주간업무현황_${weekLabel.replace(/[\/\s~]/g, "_")}.csv`;
     link.href = URL.createObjectURL(blob);
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
@@ -735,12 +766,7 @@ function App() {
 
   const copyCurrentEvent = () => {
     if (!form.content.trim()) return;
-    setCopiedEvent({
-      dept: form.dept,
-      grade: form.grade,
-      content: form.content,
-      password: form.password
-    });
+    setCopiedEvent({ dept: form.dept, grade: form.grade, content: form.content, password: form.password });
     closeEventModal();
   };
 
@@ -758,10 +784,7 @@ function App() {
       const newEv = { id: numericId, ...form };
       if (supabase) {
         const { error } = await supabase.from('events').insert([newEv]);
-        if (error) {
-          setPwCheckError("DB 저장 실패: " + error.message);
-          return;
-        }
+        if (error) { setPwCheckError("DB 저장 실패: " + error.message); return; }
       }
       setEvents((prev) => [...prev, newEv]);
       closeEventModal();
@@ -772,10 +795,7 @@ function App() {
       }
       if (supabase) {
         const { error } = await supabase.from('events').update(form).eq('id', eventModal.data.id);
-        if (error) {
-          setPwCheckError("DB 수정 실패: " + error.message);
-          return;
-        }
+        if (error) { setPwCheckError("DB 수정 실패: " + error.message); return; }
       }
       setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...form } : e)));
       closeEventModal();
@@ -789,48 +809,27 @@ function App() {
     }
     if (supabase) {
       const { error } = await supabase.from('events').delete().eq('id', eventModal.data.id);
-      if (error) {
-        setPwCheckError("DB 삭제 실패: " + error.message);
-        return;
-      }
+      if (error) { setPwCheckError("DB 삭제 실패: " + error.message); return; }
     }
     setEvents((prev) => prev.filter((e) => e.id !== eventModal.data.id));
     closeEventModal();
   };
 
   const openMasterPwModal = () => {
-    setCurrentPwInput("");
-    setNewPwInput("");
-    setNewPwConfirmInput("");
-    setMasterPwError("");
-    setMasterPwSuccess("");
+    setCurrentPwInput(""); setNewPwInput(""); setNewPwConfirmInput(""); setMasterPwError(""); setMasterPwSuccess("");
     setMasterPwModalOpen(true);
   };
 
   const handleSaveMasterPassword = () => {
-    setMasterPwError("");
-    setMasterPwSuccess("");
-
-    if (currentPwInput !== masterPassword) {
-      setMasterPwError("현재 마스터 비밀번호가 일치하지 않습니다.");
-      return;
-    }
-    if (!newPwInput.trim()) {
-      setMasterPwError("새 비밀번호를 입력해주세요.");
-      return;
-    }
-    if (newPwInput !== newPwConfirmInput) {
-      setMasterPwError("새 비밀번호가 일치하지 않습니다.");
-      return;
-    }
-
+    setMasterPwError(""); setMasterPwSuccess("");
+    if (currentPwInput !== masterPassword) { setMasterPwError("현재 마스터 비밀번호가 일치하지 않습니다."); return; }
+    if (!newPwInput.trim()) { setMasterPwError("새 비밀번호를 입력해주세요."); return; }
+    if (newPwInput !== newPwConfirmInput) { setMasterPwError("새 비밀번호가 일치하지 않습니다."); return; }
     const cleanPw = newPwInput.trim();
     localStorage.setItem("sp_master_pw", cleanPw);
     setMasterPassword(cleanPw);
     setMasterPwSuccess("마스터 비밀번호가 성공적으로 변경되었습니다.");
-    setTimeout(() => {
-      setMasterPwModalOpen(false);
-    }, 1200);
+    setTimeout(() => { setMasterPwModalOpen(false); }, 1200);
   };
 
   const handleResetMasterPassword = () => {
@@ -838,23 +837,16 @@ function App() {
       localStorage.setItem("sp_master_pw", MASTER_PASSWORD_DEFAULT);
       setMasterPassword(MASTER_PASSWORD_DEFAULT);
       setMasterPwSuccess("마스터 비밀번호가 초기값(1234)으로 리셋되었습니다.");
-      setTimeout(() => {
-        setMasterPwModalOpen(false);
-      }, 1200);
+      setTimeout(() => { setMasterPwModalOpen(false); }, 1200);
     }
   };
 
   const openHolidayModal = () => {
-    setHolidayPwInput("");
-    setHolidayPwError("");
-    setHolidayModalStage("password");
+    setHolidayPwInput(""); setHolidayPwError(""); setHolidayModalStage("password");
   };
 
   const submitHolidayPassword = () => {
-    if (holidayPwInput !== masterPassword) {
-      setHolidayPwError("비밀번호가 일치하지 않습니다.");
-      return;
-    }
+    if (holidayPwInput !== masterPassword) { setHolidayPwError("비밀번호가 일치하지 않습니다."); return; }
     setHolidayModalStage("edit");
   };
 
@@ -890,10 +882,7 @@ function App() {
   };
 
   const submitAdminPassword = () => {
-    if (adminPwInput !== masterPassword) {
-      setAdminPwError("비밀번호가 일치하지 않습니다.");
-      return;
-    }
+    if (adminPwInput !== masterPassword) { setAdminPwError("비밀번호가 일치하지 않습니다."); return; }
     const initialWeekKey = modalWeekCalculated.key;
     const savedData = adminWorkStatus[initialWeekKey] || {};
     const base = {};
@@ -912,12 +901,9 @@ function App() {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return trimmed;
       const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
-      const hasDatePrefix = /^\d{1,2}\s*\([월화수목금토일]\)/.test(trimmed);
-      if (hasDatePrefix) return trimmed;
+      if (/^\d{1,2}\s*\([월화수목금토일]\)/.test(trimmed)) return trimmed;
       return `${dayStr} ${trimmed}`;
-    } catch {
-      return trimmed;
-    }
+    } catch { return trimmed; }
   };
 
   const stageCurrentAdminItem = () => {
@@ -927,7 +913,6 @@ function App() {
     const d = new Date(adminTargetDate);
     const wKey = ymd(startOfWeekMon(d));
     const sharedArr = Array.from(adminSharedRoles);
-
     setStagedAdminItems(prev => [
       ...prev,
       {
@@ -981,19 +966,15 @@ function App() {
 
     const updatedMap = { ...adminWorkStatus };
     const weekKeysToUpsert = new Set();
-
     itemsToProcess.forEach(item => {
       const wKey = item.weekKey;
       weekKeysToUpsert.add(wKey);
       const curData = { ...(updatedMap[wKey] || {}) };
-      
       const targetRoles = [item.role, ...item.sharedRoles];
       targetRoles.forEach(r => {
         const oldVal = curData[r] && curData[r] !== "특이사항 없음" ? curData[r].trim() : "";
         if (oldVal) {
-          if (!oldVal.includes(item.content)) {
-            curData[r] = `${oldVal}\n${item.content}`;
-          }
+          if (!oldVal.includes(item.content)) curData[r] = `${oldVal}\n${item.content}`;
         } else {
           curData[r] = item.content;
         }
@@ -1008,7 +989,6 @@ function App() {
       }));
       await supabase.from('admin_status').upsert(upsertRows);
     }
-
     setAdminWorkStatus(updatedMap);
     setAdminModalStage(null);
   };
@@ -1016,16 +996,11 @@ function App() {
   const closeAdminModal = () => setAdminModalStage(null);
 
   const openDeptEdit = () => {
-    setDeptPwInput("");
-    setDeptPwError("");
-    setDeptModalStage("password");
+    setDeptPwInput(""); setDeptPwError(""); setDeptModalStage("password");
   };
 
   const submitDeptPassword = () => {
-    if (deptPwInput !== masterPassword) {
-      setDeptPwError("비밀번호가 일치하지 않습니다.");
-      return;
-    }
+    if (deptPwInput !== masterPassword) { setDeptPwError("비밀번호가 일치하지 않습니다."); return; }
     setDeptEditRows(depts.map((d, i) => ({ key: `i${i}`, value: d })));
     setDeptModalStage("edit");
   };
@@ -1096,15 +1071,11 @@ function App() {
               <span className="rounded bg-violet-800 px-1.5 py-0.5 font-bold shrink-0">복사됨</span>
               <span className="truncate font-medium">"{copiedEvent.content}" (원하는 날짜의 '+' 버튼을 눌러 붙여넣기하세요)</span>
             </div>
-            <button
-              onClick={() => setCopiedEvent(null)}
-              className="ml-2 shrink-0 rounded-lg bg-violet-700 px-2 py-0.5 text-xs hover:bg-violet-800"
-            >
-              해제
-            </button>
+            <button onClick={() => setCopiedEvent(null)} className="ml-2 shrink-0 rounded-lg bg-violet-700 px-2 py-0.5 text-xs hover:bg-violet-800">해제</button>
           </div>
         )}
 
+        {/* 헤더 */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="./logo.png" alt="경연초 교표" className="h-10 w-10 shrink-0 object-contain" />
@@ -1113,7 +1084,6 @@ function App() {
               <p className="text-xs text-slate-400">학년·부서별 일정과 관리자 근무 현황을 실시간 공유</p>
             </div>
           </div>
-
           {supabase && (
             <button onClick={() => { setKeyInput(anonKey); setKeyModalOpen(true); }} className="flex items-center gap-1 rounded-xl bg-emerald-100 px-2.5 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-200 transition" title="Supabase 실시간 연동 상태입니다">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1122,7 +1092,15 @@ function App() {
           )}
         </div>
 
-        <div className="mb-2 flex justify-end gap-2">
+        {/* 상단 우측 버튼군: 엑셀 업로드 / 재량휴업일 관리 / 마스터 PW 변경 */}
+        <div className="mb-2 flex flex-wrap justify-end gap-2">
+          <button
+            onClick={() => { setUploadModalOpen(true); setUploadParsedEvents([]); setUploadStatus(""); }}
+            className="flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3.5 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-sm"
+          >
+            <UploadCloudIcon size={14} className="text-indigo-500" />
+            일정 엑셀 업로드
+          </button>
           <button
             onClick={openHolidayModal}
             className="flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50 transition shadow-sm"
@@ -1151,21 +1129,12 @@ function App() {
               </button>
             </div>
 
-            {/* 출력 & 엑셀 다운로드 버튼 */}
             <div className="flex items-center gap-1">
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-violet-600 transition shadow-xs"
-                title={`${tab === "month" ? "월별 일정" : "주간 업무 현황"} 인쇄/출력`}
-              >
+              <button onClick={handlePrint} className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-violet-600 transition shadow-xs" title="인쇄/출력">
                 <PrinterIcon size={14} className="text-slate-400" />
                 <span>출력</span>
               </button>
-              <button
-                onClick={handleDownloadExcel}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition shadow-xs"
-                title={`${tab === "month" ? "월별 일정" : "주간 업무 현황"} 엑셀/스프레드시트(CSV) 다운로드`}
-              >
+              <button onClick={handleDownloadExcel} className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition shadow-xs" title="엑셀 다운로드">
                 <DownloadIcon size={14} className="text-emerald-500" />
                 <span>다운로드</span>
               </button>
@@ -1173,19 +1142,14 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={goPrev} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-              <ChevronLeft size={18} />
-            </button>
-            <span className="min-w-[90px] text-center text-sm font-bold text-slate-700">
-              {tab === "month" ? monthLabel : weekLabel}
-            </span>
-            <button onClick={goNext} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-              <ChevronRight size={18} />
-            </button>
-            <button onClick={goToday} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50"> 오늘 </button>
+            <button onClick={goPrev} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><ChevronLeft size={18} /></button>
+            <span className="min-w-[90px] text-center text-sm font-bold text-slate-700">{tab === "month" ? monthLabel : weekLabel}</span>
+            <button onClick={goNext} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><ChevronRight size={18} /></button>
+            <button onClick={goToday} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">오늘</button>
           </div>
         </div>
 
+        {/* 필터 영역 */}
         <div className="mb-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <FilterRow label="학년" items={GRADES} selected={selectedGrades} onToggle={(v) => toggleInSet(selectedGrades, setSelectedGrades, v)} onAll={() => setSelectedGrades(new Set(GRADES))} onNone={() => setSelectedGrades(new Set())} />
           <FilterRow label="담당 부서" items={depts} selected={selectedDepts} onToggle={(v) => toggleInSet(selectedDepts, setSelectedDepts, v)} onAll={() => setSelectedDepts(new Set(depts))} onNone={() => setSelectedDepts(new Set())} editAction={
@@ -1196,8 +1160,18 @@ function App() {
           <p className="text-[11px] text-slate-400">* 학년/부서가 미지정인 일정은 필터와 관계없이 항상 표시됩니다.</p>
         </div>
 
-        <div className="mb-3 flex justify-end">
-          <button onClick={() => openAddEvent(tab === "month" ? ymd(today) : ymd(weekDates[0]))} className="flex items-center gap-1 rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600 transition">
+        {/* 일정 추가 & 엑셀 업로드 버튼 */}
+        <div className="mb-3 flex justify-end gap-2">
+          <button
+            onClick={() => { setUploadModalOpen(true); setUploadParsedEvents([]); setUploadStatus(""); }}
+            className="flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm hover:bg-indigo-100 transition"
+          >
+            <UploadCloudIcon size={14} /> 엑셀 일괄 업로드
+          </button>
+          <button
+            onClick={() => openAddEvent(tab === "month" ? ymd(today) : ymd(weekDates[0]))}
+            className="flex items-center gap-1 rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600 transition"
+          >
             <PlusIcon size={14} /> 일정 추가
           </button>
         </div>
@@ -1205,32 +1179,14 @@ function App() {
         {tab === "month" ? (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 mb-8">
             {monthDays.map((d, idx) => (
-              <DateRow
-                key={ymd(d)}
-                date={d}
-                today={today}
-                events={eventsByDate[ymd(d)] || []}
-                isLast={idx === monthDays.length - 1}
-                onAddEvent={openAddEvent}
-                onOpenEvent={openEditEvent}
-                customHolidays={customHolidays}
-              />
+              <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === monthDays.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} customHolidays={customHolidays} />
             ))}
           </div>
         ) : (
           <>
             <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
               {weekDates.map((d, idx) => (
-                <DateRow
-                  key={ymd(d)}
-                  date={d}
-                  today={today}
-                  events={eventsByDate[ymd(d)] || []}
-                  isLast={idx === weekDates.length - 1}
-                  onAddEvent={openAddEvent}
-                  onOpenEvent={openEditEvent}
-                  customHolidays={customHolidays}
-                />
+                <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === weekDates.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} customHolidays={customHolidays} />
               ))}
             </div>
 
@@ -1249,12 +1205,7 @@ function App() {
                 {ADMIN_ROLES.map((role) => {
                   const text = currentWeekTexts[role];
                   return (
-                    <div
-                      key={role}
-                      onClick={() => openAdminInput(role)}
-                      className="group relative cursor-pointer rounded-xl bg-slate-50 p-3.5 transition hover:bg-violet-50/60 hover:ring-1 hover:ring-violet-300"
-                      title={`${role} 근무 현황 입력`}
-                    >
+                    <div key={role} onClick={() => openAdminInput(role)} className="group relative cursor-pointer rounded-xl bg-slate-50 p-3.5 transition hover:bg-violet-50/60 hover:ring-1 hover:ring-violet-300" title={`${role} 근무 현황 입력`}>
                       <div className="mb-1.5 flex items-center justify-between">
                         <p className="text-xs font-extrabold text-slate-600 group-hover:text-violet-600">{role}</p>
                         <span className="text-[11px] font-semibold text-violet-400 opacity-0 transition group-hover:opacity-100">수정 ✎</span>
@@ -1270,7 +1221,98 @@ function App() {
           </>
         )}
 
-        {/* 1. 관리자 마스터 비밀번호 변경 모달 */}
+        {/* ==================== 1. 엑셀 일괄 업로드 모달 ==================== */}
+        {uploadModalOpen && (
+          <Modal title="학사 일정 엑셀(CSV) 일괄 업로드" onClose={() => setUploadModalOpen(false)} wide>
+            <div className="space-y-4">
+              <div className="rounded-xl bg-indigo-50/70 p-3.5 border border-indigo-100 text-xs text-indigo-900 leading-relaxed">
+                <p className="font-bold mb-1">💡 작성 및 업로드 가이드</p>
+                <ol className="list-decimal list-inside space-y-0.5 text-slate-600">
+                  <li>아래 <b>[샘플 양식 다운로드]</b>를 받아 엑셀이나 구글 시트에서 작성합니다.</li>
+                  <li>날짜는 <code>2026-10-01</code> 형식으로 적고, 담당부서/학년/행사내용을 채웁니다.</li>
+                  <li>작성 완료 후 <b>[파일 선택]</b>으로 업로드하고 <b>[DB에 일괄 등록]</b>을 누르면 끝납니다.</li>
+                </ol>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleDownloadSampleTemplate}
+                  className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
+                >
+                  <DownloadIcon size={14} className="text-indigo-500" />
+                  샘플 엑셀 양식 다운로드 (.csv)
+                </button>
+
+                <div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".csv, text/csv, .txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                    className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-sm"
+                  >
+                    <UploadCloudIcon size={14} />
+                    작성한 엑셀 파일 선택
+                  </button>
+                </div>
+              </div>
+
+              {uploadStatus && (
+                <p className={`text-xs font-bold ${uploadParsedEvents.length > 0 ? "text-indigo-600" : "text-rose-500"}`}>
+                  {uploadStatus}
+                </p>
+              )}
+
+              {uploadParsedEvents.length > 0 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-700 mb-2">업로드 대기 목록 (상위 5개 미리보기)</p>
+                  <div className="max-h-36 overflow-y-auto space-y-1 pr-1 text-xs">
+                    {uploadParsedEvents.slice(0, 5).map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between rounded bg-white p-1.5 border border-slate-200">
+                        <span className="font-bold text-indigo-600">{item.date}</span>
+                        <span className="text-slate-500 truncate max-w-[200px]">{item.content}</span>
+                        <span className="text-[11px] text-slate-400">[{item.dept || "전체"}]</span>
+                      </div>
+                    ))}
+                    {uploadParsedEvents.length > 5 && (
+                      <p className="text-[11px] text-slate-400 text-center pt-1">... 외 {uploadParsedEvents.length - 5}개의 일정</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setUploadModalOpen(false)}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmUpload}
+                  disabled={uploadParsedEvents.length === 0}
+                  className={`flex-1 rounded-xl py-2.5 text-sm font-bold text-white transition shadow-md ${
+                    uploadParsedEvents.length > 0
+                      ? "bg-violet-600 hover:bg-violet-700 shadow-violet-200"
+                      : "bg-slate-300 cursor-not-allowed"
+                  }`}
+                >
+                  DB에 일괄 등록하기 ({uploadParsedEvents.length}개)
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* 2. 관리자 마스터 비밀번호 변경 모달 */}
         {masterPwModalOpen && (
           <Modal title="관리자 마스터 비밀번호 변경" onClose={() => setMasterPwModalOpen(false)}>
             <p className="mb-3 text-xs text-slate-500 leading-relaxed">
@@ -1279,82 +1321,39 @@ function App() {
             <div className="space-y-3">
               <div>
                 <FieldLabel>현재 마스터 비밀번호</FieldLabel>
-                <input
-                  type="password"
-                  value={currentPwInput}
-                  onChange={(e) => setCurrentPwInput(e.target.value)}
-                  className={inputCls}
-                  placeholder="현재 비밀번호 입력"
-                />
+                <input type="password" value={currentPwInput} onChange={(e) => setCurrentPwInput(e.target.value)} className={inputCls} placeholder="현재 비밀번호 입력" />
               </div>
               <div>
                 <FieldLabel>새 마스터 비밀번호</FieldLabel>
-                <input
-                  type="password"
-                  value={newPwInput}
-                  onChange={(e) => setNewPwInput(e.target.value)}
-                  className={inputCls}
-                  placeholder="새 비밀번호 입력"
-                />
+                <input type="password" value={newPwInput} onChange={(e) => setNewPwInput(e.target.value)} className={inputCls} placeholder="새 비밀번호 입력" />
               </div>
               <div>
                 <FieldLabel>새 마스터 비밀번호 확인</FieldLabel>
-                <input
-                  type="password"
-                  value={newPwConfirmInput}
-                  onChange={(e) => setNewPwConfirmInput(e.target.value)}
-                  className={inputCls}
-                  placeholder="새 비밀번호 다시 입력"
-                />
+                <input type="password" value={newPwConfirmInput} onChange={(e) => setNewPwConfirmInput(e.target.value)} className={inputCls} placeholder="새 비밀번호 다시 입력" />
               </div>
 
               {masterPwError && <p className="text-xs font-semibold text-rose-500">{masterPwError}</p>}
               {masterPwSuccess && <p className="text-xs font-semibold text-emerald-600">{masterPwSuccess}</p>}
 
               <div className="flex items-center gap-2 pt-2">
-                <button
-                  onClick={() => setMasterPwModalOpen(false)}
-                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleSaveMasterPassword}
-                  className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-md shadow-violet-200"
-                >
-                  비밀번호 변경
-                </button>
+                <button onClick={() => setMasterPwModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+                <button onClick={handleSaveMasterPassword} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-md shadow-violet-200">비밀번호 변경</button>
               </div>
 
               <div className="pt-2">
-                <button
-                  onClick={handleResetMasterPassword}
-                  className="w-full rounded-xl border border-rose-100 bg-rose-50/70 py-2 text-xs font-bold text-rose-500 hover:bg-rose-100 transition"
-                >
-                  비밀번호 초기화
-                </button>
+                <button onClick={handleResetMasterPassword} className="w-full rounded-xl border border-rose-100 bg-rose-50/70 py-2 text-xs font-bold text-rose-500 hover:bg-rose-100 transition">비밀번호 초기화</button>
               </div>
             </div>
           </Modal>
         )}
 
-        {/* 2. 학교 재량휴업일(맞춤 휴일) 모달 */}
+        {/* 3. 재량휴업일 관리 모달 */}
         {holidayModalStage === "password" && (
           <Modal title="재량휴업일 관리 인증" onClose={() => setHolidayModalStage(null)}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
-            <input
-              type="password"
-              autoFocus
-              value={holidayPwInput}
-              onChange={(e) => setHolidayPwInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submitHolidayPassword()}
-              className={inputCls}
-              placeholder="마스터 비밀번호 입력"
-            />
+            <input type="password" autoFocus value={holidayPwInput} onChange={(e) => setHolidayPwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitHolidayPassword()} className={inputCls} placeholder="마스터 비밀번호 입력" />
             {holidayPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{holidayPwError}</p>}
-            <button onClick={submitHolidayPassword} className="mt-4 w-full rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white hover:bg-rose-600 transition">
-              확인
-            </button>
+            <button onClick={submitHolidayPassword} className="mt-4 w-full rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white hover:bg-rose-600 transition">확인</button>
           </Modal>
         )}
 
@@ -1364,28 +1363,11 @@ function App() {
               <div className="rounded-xl bg-rose-50/60 p-3 border border-rose-100">
                 <p className="text-xs font-bold text-rose-700 mb-2">새 재량휴업일 등록</p>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="date"
-                    value={newHolDate}
-                    onChange={(e) => setNewHolDate(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-rose-400"
-                  />
-                  <input
-                    type="text"
-                    value={newHolName}
-                    onChange={(e) => setNewHolName(e.target.value)}
-                    placeholder="휴일 명칭 (예: 개교기념일)"
-                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-rose-400"
-                  />
-                  <button
-                    onClick={addCustomHoliday}
-                    className="rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-600 transition shrink-0"
-                  >
-                    추가
-                  </button>
+                  <input type="date" value={newHolDate} onChange={(e) => setNewHolDate(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-rose-400" />
+                  <input type="text" value={newHolName} onChange={(e) => setNewHolName(e.target.value)} placeholder="휴일 명칭 (예: 개교기념일)" className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-rose-400" />
+                  <button onClick={addCustomHoliday} className="rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-600 transition shrink-0">추가</button>
                 </div>
               </div>
-
               <div>
                 <p className="text-xs font-bold text-slate-500 mb-2">등록된 재량휴업일 목록</p>
                 <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
@@ -1398,51 +1380,37 @@ function App() {
                           <span className="font-bold text-slate-700">{dStr}</span>
                           <span className="rounded bg-rose-100 text-rose-600 px-2 py-0.5 font-bold text-[11px]">{name}</span>
                         </div>
-                        <button
-                          onClick={() => removeCustomHoliday(dStr)}
-                          className="text-slate-400 hover:text-rose-500 transition p-1"
-                          title="삭제"
-                        >
-                          <XIcon size={14} />
-                        </button>
+                        <button onClick={() => removeCustomHoliday(dStr)} className="text-slate-400 hover:text-rose-500 transition p-1" title="삭제"><XIcon size={14} /></button>
                       </div>
                     ))
                   )}
                 </div>
               </div>
-
               <div className="pt-2">
-                <button
-                  onClick={() => setHolidayModalStage(null)}
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
-                >
-                  닫기
-                </button>
+                <button onClick={() => setHolidayModalStage(null)} className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">닫기</button>
               </div>
             </div>
           </Modal>
         )}
 
-        {/* 3. Supabase API Anon Key 모달 */}
+        {/* 4. Supabase Key 모달 */}
         {keyModalOpen && (
           <Modal title="Supabase API Anon Key 설정" onClose={() => setKeyModalOpen(false)} wide>
             <div className="space-y-3">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Supabase 대시보드 ➔ <b>Project Settings</b> ➔ <b>API</b> 메뉴에서 복사한 <b>anon (public)</b> 키를 아래에 입력해주세요.
-              </p>
+              <p className="text-xs text-slate-500 leading-relaxed">Supabase 대시보드 ➔ <b>Project Settings</b> ➔ <b>API</b> 메뉴에서 복사한 <b>anon (public)</b> 키를 아래에 입력해주세요.</p>
               <div>
                 <FieldLabel>Anon Key</FieldLabel>
                 <textarea rows={4} value={keyInput} onChange={(e) => setKeyInput(e.target.value)} className={inputCls} placeholder="eyJhbGciOiJKV1QiLC..." />
               </div>
               <div className="flex items-center gap-2 pt-2">
-                <button onClick={() => setKeyModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"> 취소 </button>
-                <button onClick={handleSaveKey} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"> 저장 및 연동 </button>
+                <button onClick={() => setKeyModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+                <button onClick={handleSaveKey} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">저장 및 연동</button>
               </div>
             </div>
           </Modal>
         )}
 
-        {/* 4. 일정 추가/수정 모달 */}
+        {/* 5. 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={closeEventModal} wide>
             <div className="space-y-3">
@@ -1485,76 +1453,51 @@ function App() {
               <div className="flex items-center gap-2 pt-1">
                 {eventModal.mode === "edit" && (
                   <>
-                    <button onClick={deleteEvent} className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-100 transition" title="일정 삭제">
-                      <Trash2Icon size={15} /> 삭제
-                    </button>
-                    <button onClick={copyCurrentEvent} className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-600 hover:bg-violet-100 transition" title="이 일정의 내용을 복사합니다">
-                      <CopyIcon size={15} /> 복사
-                    </button>
+                    <button onClick={deleteEvent} className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-100 transition" title="일정 삭제"><Trash2Icon size={15} /> 삭제</button>
+                    <button onClick={copyCurrentEvent} className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold text-violet-600 hover:bg-violet-100 transition" title="복사"><CopyIcon size={15} /> 복사</button>
                   </>
                 )}
-                <button onClick={closeEventModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"> 취소 </button>
-                <button onClick={saveEvent} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"> {eventModal.mode === "add" ? "추가" : "수정"} </button>
+                <button onClick={closeEventModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+                <button onClick={saveEvent} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">{eventModal.mode === "add" ? "추가" : "수정"}</button>
               </div>
             </div>
           </Modal>
         )}
 
-        {/* 5. 관리자 근무 현황 인증 모달 */}
+        {/* 6. 관리자 근무 현황 인증 모달 */}
         {adminModalStage === "password" && (
           <Modal title="관리자 인증" onClose={closeAdminModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
             <input type="password" autoFocus value={adminPwInput} onChange={(e) => setAdminPwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitAdminPassword()} className={inputCls} placeholder="비밀번호를 입력하세요" />
             {adminPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{adminPwError}</p>}
-            <button onClick={submitAdminPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"> 확인 </button>
+            <button onClick={submitAdminPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">확인</button>
             <p className="mt-2 text-center text-[11px] text-slate-300">기본 마스터 비밀번호: {MASTER_PASSWORD_DEFAULT}</p>
           </Modal>
         )}
 
-        {/* 6. 관리자 근무 현황 작성 모달 */}
+        {/* 7. 관리자 근무 현황 작성 모달 */}
         {adminModalStage === "edit" && (
-          <Modal
-            title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성` : `관리자 근무 현황 작성`}
-            onClose={closeAdminModal}
-            wide
-          >
+          <Modal title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성` : `관리자 근무 현황 작성`} onClose={closeAdminModal} wide>
             {adminTargetRole && adminTargetRole !== 'ALL' ? (
               <div className="space-y-3.5">
                 <div className="rounded-xl bg-violet-50/70 p-3 border border-violet-100 space-y-2.5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <FieldLabel>기준 날짜 (해당 일자가 내용 앞에 자동 표시)</FieldLabel>
-                      <input
-                        type="date"
-                        value={adminTargetDate}
-                        onChange={(e) => setAdminTargetDate(e.target.value)}
-                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-400"
-                      />
+                      <input type="date" value={adminTargetDate} onChange={(e) => setAdminTargetDate(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-400" />
                     </div>
                     <div className="text-right">
                       <span className="text-[11px] font-bold text-slate-400 block">적용 주간</span>
-                      <span className="text-xs font-extrabold text-violet-600">
-                        {modalWeekCalculated.label} {modalWeekCalculated.dayStr && `[${modalWeekCalculated.dayStr}]`}
-                      </span>
+                      <span className="text-xs font-extrabold text-violet-600">{modalWeekCalculated.label} {modalWeekCalculated.dayStr && `[${modalWeekCalculated.dayStr}]`}</span>
                     </div>
                   </div>
-
                   <div className="pt-2 border-t border-violet-200/60">
                     <p className="text-[11px] font-bold text-violet-700 mb-1.5">동행 관리자 함께 등록 (선택 시 동일 내용이 함께 저장됩니다)</p>
                     <div className="flex flex-wrap gap-1.5">
                       {ADMIN_ROLES.filter(r => r !== adminTargetRole).map((r) => {
                         const isChecked = adminSharedRoles.has(r);
                         return (
-                          <button
-                            key={r}
-                            type="button"
-                            onClick={() => toggleInSet(adminSharedRoles, setAdminSharedRoles, r)}
-                            className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${
-                              isChecked
-                                ? "bg-violet-600 text-white border-violet-600 shadow-sm"
-                                : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"
-                            }`}
-                          >
+                          <button key={r} type="button" onClick={() => toggleInSet(adminSharedRoles, setAdminSharedRoles, r)} className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"}`}>
                             {isChecked ? `✓ ${r}` : `+ ${r}`}
                           </button>
                         );
@@ -1565,26 +1508,10 @@ function App() {
 
                 <div>
                   <FieldLabel>{adminTargetRole} 근무 일정 내용</FieldLabel>
-                  <textarea
-                    value={adminCurrentInput}
-                    onChange={(e) => setAdminCurrentInput(e.target.value)}
-                    rows={3}
-                    className={inputCls}
-                    placeholder="예) 15:00~20:00 교감 자율장학 (날짜를 직접 적지 않아도 기준 날짜가 앞에 자동 추가됩니다)"
-                  />
+                  <textarea value={adminCurrentInput} onChange={(e) => setAdminCurrentInput(e.target.value)} rows={3} className={inputCls} placeholder="예) 15:00~20:00 교감 자율장학 (날짜를 직접 적지 않아도 기준 날짜가 앞에 자동 추가됩니다)" />
                   <div className="mt-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={stageCurrentAdminItem}
-                      disabled={!adminCurrentInput.trim()}
-                      className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition shadow-sm ${
-                        adminCurrentInput.trim()
-                          ? "bg-violet-100 text-violet-700 hover:bg-violet-200 border border-violet-200"
-                          : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"
-                      }`}
-                    >
-                      <PlusIcon size={13} />
-                      임시 추가 (다른 날짜 계속 담기)
+                    <button type="button" onClick={stageCurrentAdminItem} disabled={!adminCurrentInput.trim()} className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition shadow-sm ${adminCurrentInput.trim() ? "bg-violet-100 text-violet-700 hover:bg-violet-200 border border-violet-200" : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"}`}>
+                      <PlusIcon size={13} /> 임시 추가 (다른 날짜 계속 담기)
                     </button>
                   </div>
                 </div>
@@ -1601,19 +1528,10 @@ function App() {
                           <div className="min-w-0 flex-1 pr-2">
                             <p className="font-bold text-slate-700">{item.content}</p>
                             {item.sharedRoles.length > 0 && (
-                              <p className="text-[10px] text-violet-600 font-semibold mt-0.5">
-                                동행: {item.sharedRoles.join(", ")}
-                              </p>
+                              <p className="text-[10px] text-violet-600 font-semibold mt-0.5">동행: {item.sharedRoles.join(", ")}</p>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => removeStagedItem(item.id)}
-                            className="text-slate-300 hover:text-rose-500 p-0.5 transition shrink-0"
-                            title="삭제"
-                          >
-                            <XIcon size={14} />
-                          </button>
+                          <button type="button" onClick={() => removeStagedItem(item.id)} className="text-slate-300 hover:text-rose-500 p-0.5 transition shrink-0" title="삭제"><XIcon size={14} /></button>
                         </div>
                       ))}
                     </div>
@@ -1625,20 +1543,14 @@ function App() {
                 {ADMIN_ROLES.map((role) => (
                   <div key={role}>
                     <FieldLabel>{role}</FieldLabel>
-                    <textarea
-                      value={adminFormTexts[role] || ""}
-                      onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
-                      rows={2}
-                      className={inputCls}
-                      placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회"
-                    />
+                    <textarea value={adminFormTexts[role] || ""} onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })} rows={2} className={inputCls} placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회" />
                   </div>
                 ))}
               </div>
             )}
 
             <div className="mt-4 flex items-center gap-2">
-              <button onClick={closeAdminModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"> 취소 </button>
+              <button onClick={closeAdminModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
               <button onClick={saveAdminTexts} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition shadow-md shadow-violet-200">
                 {stagedAdminItems.length > 0 ? `일괄 저장 (${stagedAdminItems.length + (adminCurrentInput.trim() ? 1 : 0)}개)` : "저장"}
               </button>
@@ -1646,37 +1558,33 @@ function App() {
           </Modal>
         )}
 
-        {/* 7. 부서명 수정 인증 모달 */}
+        {/* 8. 부서명 수정 인증 모달 */}
         {deptModalStage === "password" && (
           <Modal title="마스터 인증" onClose={closeDeptModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
             <input type="password" autoFocus value={deptPwInput} onChange={(e) => setDeptPwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitDeptPassword()} className={inputCls} placeholder="비밀번호를 입력하세요" />
             {deptPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{deptPwError}</p>}
-            <button onClick={submitDeptPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"> 확인 </button>
+            <button onClick={submitDeptPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">확인</button>
             <p className="mt-2 text-center text-[11px] text-slate-300">기본 마스터 비밀번호: {MASTER_PASSWORD_DEFAULT}</p>
           </Modal>
         )}
 
-        {/* 8. 부서명 수정 편집 모달 */}
+        {/* 9. 부서명 수정 편집 모달 */}
         {deptModalStage === "edit" && (
           <Modal title="담당 부서명 수정" onClose={closeDeptModal} wide>
             <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
               {deptEditRows.map((row) => (
                 <div key={row.key} className="flex items-center gap-2">
                   <input type="text" value={row.value} onChange={(e) => updateDeptRow(row.key, e.target.value)} className={inputCls} placeholder="부서명" />
-                  <button onClick={() => removeDeptRow(row.key)} title="이 부서 삭제" className="shrink-0 rounded-lg p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition">
-                    <XIcon size={16} />
-                  </button>
+                  <button onClick={() => removeDeptRow(row.key)} title="이 부서 삭제" className="shrink-0 rounded-lg p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition"><XIcon size={16} /></button>
                 </div>
               ))}
             </div>
-            <button onClick={addDeptRow} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 py-2 text-xs font-bold text-slate-400 hover:border-violet-300 hover:text-violet-500 transition">
-              <PlusIcon size={14} /> 부서 추가
-            </button>
+            <button onClick={addDeptRow} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 py-2 text-xs font-bold text-slate-400 hover:border-violet-300 hover:text-violet-500 transition"><PlusIcon size={14} /> 부서 추가</button>
             <p className="mt-2 text-[11px] text-slate-400">* 부서명을 삭제하면 해당 부서로 등록된 일정은 '미지정'으로 변경됩니다.</p>
             <div className="mt-4 flex items-center gap-2">
-              <button onClick={closeDeptModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"> 취소 </button>
-              <button onClick={saveDeptEdits} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"> 저장 </button>
+              <button onClick={closeDeptModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+              <button onClick={saveDeptEdits} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">저장</button>
             </div>
           </Modal>
         )}
