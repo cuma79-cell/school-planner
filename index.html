@@ -178,7 +178,6 @@ function Badge({ className = "", children }) {
   );
 }
 
-// 모달 바깥 클릭으로 인한 실수 닫힘 방지
 function Modal({ title, onClose, children, wide = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm overflow-y-auto">
@@ -341,8 +340,10 @@ function App() {
   const [pwCheckInput, setPwCheckInput] = useState("");
   const [pwCheckError, setPwCheckError] = useState("");
 
+  // 관리자 근무 입력 모달 상태
   const [adminModalStage, setAdminModalStage] = useState(null);
   const [adminTargetRole, setAdminTargetRole] = useState(null);
+  const [adminTargetDate, setAdminTargetDate] = useState(ymd(today)); // 모달에서 직접 선택하는 기준 날짜
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
   const [adminFormTexts, setAdminFormTexts] = useState({});
@@ -433,6 +434,37 @@ function App() {
   const weekKey = ymd(weekStart);
   const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} ~ ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
   const currentWeekTexts = adminWorkStatus[weekKey] || {};
+
+  // 모달 내에서 날짜 선택에 따라 계산되는 주간 키 및 라벨
+  const modalWeekCalculated = useMemo(() => {
+    try {
+      const d = new Date(adminTargetDate);
+      if (isNaN(d.getTime())) return { key: weekKey, label: weekLabel };
+      const wDates = getWeekdays(d);
+      const wSt = wDates[0];
+      const wEn = wDates[4];
+      const wK = ymd(wSt);
+      const wLbl = `${wSt.getMonth() + 1}/${wSt.getDate()} ~ ${wEn.getMonth() + 1}/${wEn.getDate()}`;
+      return { key: wK, label: wLbl };
+    } catch {
+      return { key: weekKey, label: weekLabel };
+    }
+  }, [adminTargetDate, weekKey, weekLabel]);
+
+  // 모달에서 날짜 변경 시 해당 주간의 저장된 데이터 자동 로드
+  const handleAdminModalDateChange = (newDateStr) => {
+    setAdminTargetDate(newDateStr);
+    try {
+      const d = new Date(newDateStr);
+      if (!isNaN(d.getTime())) {
+        const targetWKey = ymd(startOfWeekMon(d));
+        const savedData = adminWorkStatus[targetWKey] || {};
+        const base = {};
+        ADMIN_ROLES.forEach((r) => (base[r] = savedData[r] || ""));
+        setAdminFormTexts(base);
+      }
+    } catch (e) {}
+  };
 
   const toggleInSet = (set, setter, value) => {
     const next = new Set(set);
@@ -617,8 +649,10 @@ function App() {
     }
   };
 
+  // 관리자 모달 열기 (현재 보고 있는 주간의 날짜를 기본값으로 지정)
   const openAdminInput = (role = 'ALL') => {
     setAdminTargetRole(role);
+    setAdminTargetDate(tab === "week" ? ymd(weekStart) : ymd(today));
     setAdminPwInput("");
     setAdminPwError("");
     setAdminModalStage("password");
@@ -629,18 +663,21 @@ function App() {
       setAdminPwError("비밀번호가 일치하지 않습니다.");
       return;
     }
+    const initialWeekKey = modalWeekCalculated.key;
+    const savedData = adminWorkStatus[initialWeekKey] || {};
     const base = {};
-    ADMIN_ROLES.forEach((r) => (base[r] = currentWeekTexts[r] || ""));
+    ADMIN_ROLES.forEach((r) => (base[r] = savedData[r] || ""));
     setAdminFormTexts(base);
     setAdminModalStage("edit");
   };
 
   const saveAdminTexts = async () => {
     const updatedData = { ...adminFormTexts };
+    const targetWKey = modalWeekCalculated.key;
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: weekKey, data: updatedData }]);
+      await supabase.from('admin_status').upsert([{ week_key: targetWKey, data: updatedData }]);
     }
-    setAdminWorkStatus((prev) => ({ ...prev, [weekKey]: updatedData }));
+    setAdminWorkStatus((prev) => ({ ...prev, [targetWKey]: updatedData }));
     setAdminModalStage(null);
   };
 
@@ -851,6 +888,7 @@ function App() {
               ))}
             </div>
 
+            {/* 관리자 근무 현황 카드 */}
             <div className="mt-4 mb-8 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -1127,14 +1165,32 @@ function App() {
           </Modal>
         )}
 
-        {/* 6. 관리자 근무 현황 작성 모달 */}
+        {/* 6. 관리자 근무 현황 작성 모달 (기준 날짜 선택기 탑재) */}
         {adminModalStage === "edit" && (
           <Modal
-            title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성 (${weekLabel})` : `관리자 근무 현황 작성 (${weekLabel})`}
+            title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성` : `관리자 근무 현황 작성`}
             onClose={closeAdminModal}
             wide
           >
-            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+            <div className="mb-4 rounded-xl bg-violet-50/70 p-3 border border-violet-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <FieldLabel>기준 날짜 (해당 주간 자동 지정)</FieldLabel>
+                  <input
+                    type="date"
+                    value={adminTargetDate}
+                    onChange={(e) => handleAdminModalDateChange(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-400"
+                  />
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] font-bold text-slate-400 block">적용 주간</span>
+                  <span className="text-xs font-extrabold text-violet-600">{modalWeekCalculated.label}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
               {(adminTargetRole && adminTargetRole !== 'ALL' ? [adminTargetRole] : ADMIN_ROLES).map((role) => (
                 <div key={role}>
                   <FieldLabel>{role}</FieldLabel>
@@ -1143,7 +1199,7 @@ function App() {
                     onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
                     rows={adminTargetRole && adminTargetRole !== 'ALL' ? 4 : 2}
                     className={inputCls}
-                    placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회(11:00~16:30, 청라커낼웨이 일대)"
+                    placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회"
                   />
                 </div>
               ))}
