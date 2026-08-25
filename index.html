@@ -74,6 +74,12 @@ const Trash2Icon = ({ size = 15, className = "" }) => (
 const CopyIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
 );
+const PrinterIcon = ({ size = 14, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+);
+const DownloadIcon = ({ size = 14, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+);
 const LockIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 );
@@ -164,6 +170,10 @@ function getMonthDays(viewDate) {
 function getWeekdays(anchor) {
   const mon = startOfWeekMon(anchor);
   return [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
+}
+
+function weekKeyOf(date) {
+  return ymd(startOfWeekMon(date));
 }
 
 function Badge({ className = "", children }) {
@@ -338,13 +348,12 @@ function App() {
   const [pwCheckInput, setPwCheckInput] = useState("");
   const [pwCheckError, setPwCheckError] = useState("");
 
-  // 관리자 근무 입력 모달 상태
   const [adminModalStage, setAdminModalStage] = useState(null);
   const [adminTargetRole, setAdminTargetRole] = useState(null);
   const [adminTargetDate, setAdminTargetDate] = useState(ymd(today));
   const [adminSharedRoles, setAdminSharedRoles] = useState(new Set());
-  const [adminCurrentInput, setAdminCurrentInput] = useState(""); // 현재 작성 중인 텍스트
-  const [stagedAdminItems, setStagedAdminItems] = useState([]); // 임시 저장 대기 목록
+  const [adminCurrentInput, setAdminCurrentInput] = useState("");
+  const [stagedAdminItems, setStagedAdminItems] = useState([]);
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
   const [adminFormTexts, setAdminFormTexts] = useState({});
@@ -457,6 +466,234 @@ function App() {
       return { key: weekKey, label: weekLabel, dayStr: "" };
     }
   }, [adminTargetDate, weekKey, weekLabel]);
+
+  // ==================== [인쇄 및 엑셀 다운로드 기능] ====================
+  // 1. 인쇄 (Print) 기능
+  const handlePrint = () => {
+    const isMonth = tab === "month";
+    const title = isMonth
+      ? `인천경연초등학교 ${monthLabel} 학사 일정표`
+      : `인천경연초등학교 주간 업무 및 근무 현황 (${weekLabel})`;
+
+    let contentHtml = "";
+
+    if (isMonth) {
+      contentHtml = `
+        <table style="width:100%; border-collapse:collapse; margin-top:15px; font-size:13px;">
+          <thead>
+            <tr style="background-color:#f1f5f9;">
+              <th style="border:1px solid #cbd5e1; padding:8px; width:90px;">날짜</th>
+              <th style="border:1px solid #cbd5e1; padding:8px; width:70px;">요일</th>
+              <th style="border:1px solid #cbd5e1; padding:8px; width:110px;">휴일/구분</th>
+              <th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">행사 및 학사 일정 내용</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${monthDays.map(d => {
+              const dStr = ymd(d);
+              const dow = d.getDay();
+              const hol = getHolidayName(dStr, customHolidays) || "";
+              const evList = eventsByDate[dStr] || [];
+              const isHoli = dow === 0 || !!hol;
+              const colorStyle = isHoli ? "color:#e11d48; font-weight:bold;" : dow === 6 ? "color:#2563eb;" : "color:#334155;";
+              
+              const evText = evList.length === 0
+                ? '<span style="color:#cbd5e1;">-</span>'
+                : evList.map(ev => `
+                    <div style="margin-bottom:4px;">
+                      <span style="display:inline-block; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; font-size:11px; font-weight:bold; background:#f8fafc; margin-right:5px;">
+                        ${tagLabel(ev)}
+                      </span>
+                      <span>${ev.content}</span>
+                    </div>
+                  `).join("");
+
+              return `
+                <tr style="background-color:${isHoli ? '#fff1f2' : '#ffffff'};">
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; ${colorStyle}">${dStr}</td>
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; ${colorStyle}">${WEEKDAY_KOR[dow]}요일</td>
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; color:#e11d48; font-weight:bold;">${hol}</td>
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px;">${evText}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    } else {
+      contentHtml = `
+        <h3 style="font-size:15px; font-weight:bold; margin-top:20px; color:#334155;">1. 주간 학사 및 주요 행사</h3>
+        <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;">
+          <thead>
+            <tr style="background-color:#f1f5f9;">
+              <th style="border:1px solid #cbd5e1; padding:8px; width:100px;">날짜</th>
+              <th style="border:1px solid #cbd5e1; padding:8px; width:70px;">요일</th>
+              <th style="border:1px solid #cbd5e1; padding:8px; width:110px;">휴일/구분</th>
+              <th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">행사 및 일정 내용</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${weekDates.map(d => {
+              const dStr = ymd(d);
+              const dow = d.getDay();
+              const hol = getHolidayName(dStr, customHolidays) || "";
+              const evList = eventsByDate[dStr] || [];
+              const isHoli = dow === 0 || !!hol;
+              const colorStyle = isHoli ? "color:#e11d48; font-weight:bold;" : "color:#334155;";
+
+              const evText = evList.length === 0
+                ? '<span style="color:#cbd5e1;">-</span>'
+                : evList.map(ev => `
+                    <div style="margin-bottom:4px;">
+                      <span style="display:inline-block; border:1px solid #cbd5e1; border-radius:4px; padding:1px 5px; font-size:11px; font-weight:bold; background:#f8fafc; margin-right:5px;">
+                        ${tagLabel(ev)}
+                      </span>
+                      <span>${ev.content}</span>
+                    </div>
+                  `).join("");
+
+              return `
+                <tr style="background-color:${isHoli ? '#fff1f2' : '#ffffff'};">
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; ${colorStyle}">${dStr}</td>
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; ${colorStyle}">${WEEKDAY_KOR[dow]}요일</td>
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px; text-align:center; color:#e11d48; font-weight:bold;">${hol}</td>
+                  <td style="border:1px solid #cbd5e1; padding:6px 8px;">${evText}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+
+        <h3 style="font-size:15px; font-weight:bold; margin-top:25px; color:#334155;">2. 관리자 주간 근무 현황</h3>
+        <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;">
+          <thead>
+            <tr style="background-color:#f1f5f9;">
+              <th style="border:1px solid #cbd5e1; padding:8px; width:130px;">직책</th>
+              <th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">근무 및 출장 현황</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ADMIN_ROLES.map(r => `
+              <tr>
+                <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; font-weight:bold; background-color:#fafafa;">${r}</td>
+                <td style="border:1px solid #cbd5e1; padding:8px; white-space:pre-wrap; color:#334155;">${currentWeekTexts[r] || "특이사항 없음"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("팝업 차단을 해제해주세요.");
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            @page { size: A4 portrait; margin: 15mm; }
+            body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; color: #1e293b; line-height: 1.5; margin:0; padding:10px; }
+            h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px 0; text-align: center; }
+            p.sub { font-size: 12px; color: #64748b; margin: 0 0 15px 0; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <p class="sub">인천경연초등학교 학사·근무 현황 플래너 (출력일시: ${new Date().toLocaleDateString('ko-KR')})</p>
+          ${contentHtml}
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          <\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // 2. 엑셀/스프레드시트 CSV 다운로드 기능
+  const handleDownloadExcel = () => {
+    const isMonth = tab === "month";
+    let csvRows = [];
+
+    if (isMonth) {
+      csvRows.push([`인천경연초등학교 ${monthLabel} 학사 일정표`]);
+      csvRows.push([]);
+      csvRows.push(["날짜", "요일", "휴일/구분", "담당부서", "학년", "행사 내용"]);
+
+      monthDays.forEach(d => {
+        const dStr = ymd(d);
+        const dowStr = `${WEEKDAY_KOR[d.getDay()]}요일`;
+        const hol = getHolidayName(dStr, customHolidays) || "";
+        const evList = eventsByDate[dStr] || [];
+
+        if (evList.length === 0) {
+          csvRows.push([dStr, dowStr, hol, "", "", "-"]);
+        } else {
+          evList.forEach(ev => {
+            csvRows.push([dStr, dowStr, hol, ev.dept || "전체", ev.grade || "전체", ev.content || ""]);
+          });
+        }
+      });
+    } else {
+      csvRows.push([`인천경연초등학교 주간 학사 및 근무 현황 (${weekLabel})`]);
+      csvRows.push([]);
+      csvRows.push(["[1. 주간 학사 및 주요 행사]"]);
+      csvRows.push(["날짜", "요일", "휴일/구분", "담당부서", "학년", "행사 내용"]);
+
+      weekDates.forEach(d => {
+        const dStr = ymd(d);
+        const dowStr = `${WEEKDAY_KOR[d.getDay()]}요일`;
+        const hol = getHolidayName(dStr, customHolidays) || "";
+        const evList = eventsByDate[dStr] || [];
+
+        if (evList.length === 0) {
+          csvRows.push([dStr, dowStr, hol, "", "", "-"]);
+        } else {
+          evList.forEach(ev => {
+            csvRows.push([dStr, dowStr, hol, ev.dept || "전체", ev.grade || "전체", ev.content || ""]);
+          });
+        }
+      });
+
+      csvRows.push([]);
+      csvRows.push(["[2. 관리자 주간 근무 현황]"]);
+      csvRows.push(["직책", "근무 및 출장 내용"]);
+      ADMIN_ROLES.forEach(r => {
+        csvRows.push([r, currentWeekTexts[r] || "특이사항 없음"]);
+      });
+    }
+
+    // CSV 포맷 변환 (쉼표, 따옴표, 줄바꿈 안전 처리)
+    const csvString = csvRows.map(row => 
+      row.map(cell => {
+        const cStr = String(cell ?? "");
+        if (cStr.includes(",") || cStr.includes('"') || cStr.includes("\n")) {
+          return `"${cStr.replace(/"/g, '""')}"`;
+        }
+        return cStr;
+      }).join(",")
+    ).join("\r\n");
+
+    // UTF-8 BOM 추가 (Excel에서 한글 깨짐 완전 방지)
+    const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const fileName = isMonth
+      ? `인천경연초_학사일정_${viewDate.getFullYear()}년_${viewDate.getMonth() + 1}월.csv`
+      : `인천경연초_주간업무현황_${weekLabel.replace(/[\/\s~]/g, "_")}.csv`;
+
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const toggleInSet = (set, setter, value) => {
     const next = new Set(set);
@@ -641,7 +878,6 @@ function App() {
     }
   };
 
-  // 관리자 모달 열기
   const openAdminInput = (role = 'ALL') => {
     setAdminTargetRole(role);
     setAdminTargetDate(tab === "week" ? ymd(weekStart) : ymd(today));
@@ -669,7 +905,6 @@ function App() {
     setAdminModalStage("edit");
   };
 
-  // 날짜 접두어(예: 7(월)) 포맷팅
   const formatTextWithGivenDate = (rawText, dateStr) => {
     const trimmed = (rawText || "").trim();
     if (!trimmed) return "";
@@ -685,7 +920,6 @@ function App() {
     }
   };
 
-  // 임시 추가 (대기 목록에 담기)
   const stageCurrentAdminItem = () => {
     const trimmed = adminCurrentInput.trim();
     if (!trimmed) return;
@@ -712,9 +946,7 @@ function App() {
     setStagedAdminItems(prev => prev.filter(item => item.id !== id));
   };
 
-  // 최종 일괄 저장
   const saveAdminTexts = async () => {
-    // 1. 전체 모드 (기존 방식)
     if (adminTargetRole === 'ALL') {
       const targetWKey = modalWeekCalculated.key;
       const updatedData = { ...adminFormTexts };
@@ -726,7 +958,6 @@ function App() {
       return;
     }
 
-    // 2. 개별 직책 모드: 현재 작성 중인 내용이 남아있다면 대기 목록에 포함
     let itemsToProcess = [...stagedAdminItems];
     if (adminCurrentInput.trim()) {
       const formatted = formatTextWithGivenDate(adminCurrentInput.trim(), adminTargetDate);
@@ -748,7 +979,6 @@ function App() {
       return;
     }
 
-    // 주차별로 그룹화하여 기존 데이터에 누적 병합
     const updatedMap = { ...adminWorkStatus };
     const weekKeysToUpsert = new Set();
 
@@ -761,7 +991,6 @@ function App() {
       targetRoles.forEach(r => {
         const oldVal = curData[r] && curData[r] !== "특이사항 없음" ? curData[r].trim() : "";
         if (oldVal) {
-          // 중복 내용이 없는 경우 줄바꿈으로 추가
           if (!oldVal.includes(item.content)) {
             curData[r] = `${oldVal}\n${item.content}`;
           }
@@ -910,15 +1139,39 @@ function App() {
           </button>
         </div>
 
+        {/* 탭 & 출력/다운로드 & 날짜 이동 바 */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
-          <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-            <button onClick={() => setTab("month")} className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${tab === "month" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-              <CalendarDaysIcon size={15} /> 월별 일정
-            </button>
-            <button onClick={() => setTab("week")} className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${tab === "week" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-              <ClipboardListIcon size={15} /> 주간 업무 현황
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+              <button onClick={() => setTab("month")} className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${tab === "month" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <CalendarDaysIcon size={15} /> 월별 일정
+              </button>
+              <button onClick={() => setTab("week")} className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${tab === "week" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <ClipboardListIcon size={15} /> 주간 업무 현황
+              </button>
+            </div>
+
+            {/* 출력 & 엑셀 다운로드 버튼 */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-violet-600 transition shadow-xs"
+                title={`${tab === "month" ? "월별 일정" : "주간 업무 현황"} 인쇄/출력`}
+              >
+                <PrinterIcon size={14} className="text-slate-400" />
+                <span>출력</span>
+              </button>
+              <button
+                onClick={handleDownloadExcel}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition shadow-xs"
+                title={`${tab === "month" ? "월별 일정" : "주간 업무 현황"} 엑셀/스프레드시트(CSV) 다운로드`}
+              >
+                <DownloadIcon size={14} className="text-emerald-500" />
+                <span>다운로드</span>
+              </button>
+            </div>
           </div>
+
           <div className="flex items-center gap-2">
             <button onClick={goPrev} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
               <ChevronLeft size={18} />
@@ -1258,7 +1511,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 6. 관리자 근무 현황 작성 모달 (임시 추가/일괄 저장 기능 탑재) */}
+        {/* 6. 관리자 근무 현황 작성 모달 */}
         {adminModalStage === "edit" && (
           <Modal
             title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성` : `관리자 근무 현황 작성`}
@@ -1267,7 +1520,6 @@ function App() {
           >
             {adminTargetRole && adminTargetRole !== 'ALL' ? (
               <div className="space-y-3.5">
-                {/* 1. 상단: 날짜 선택 & 동행 관리자 */}
                 <div className="rounded-xl bg-violet-50/70 p-3 border border-violet-100 space-y-2.5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
@@ -1311,7 +1563,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* 2. 근무 내용 입력창 & 임시 추가 버튼 */}
                 <div>
                   <FieldLabel>{adminTargetRole} 근무 일정 내용</FieldLabel>
                   <textarea
@@ -1338,7 +1589,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* 3. 대기(임시 추가) 목록 */}
                 {stagedAdminItems.length > 0 && (
                   <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-3">
                     <p className="text-xs font-bold text-violet-800 mb-2 flex items-center justify-between">
@@ -1371,7 +1621,6 @@ function App() {
                 )}
               </div>
             ) : (
-              /* 전체 일괄 편집 모드 */
               <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
                 {ADMIN_ROLES.map((role) => (
                   <div key={role}>
