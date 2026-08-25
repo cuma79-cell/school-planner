@@ -66,7 +66,7 @@ const KeyIcon = ({ size = 14, className = "" }) => (
 );
 
 const GRADES = ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
-const INITIAL_DEPTS = ["교무기획", "정보", "혁신연구", "진로인성안전", "특수교육운영", "문화과학", "학생생활", "과학환경", "행정실", "늘봄지원"];
+const INITIAL_DEPTS = ["교무기획", "교육정보", "교육연구", "안전자치", "특수교육", "문화체육", "학생활", "과학환경", "행정실", "늘봄지원"];
 const ADMIN_ROLES = ["교장", "교감(교무)", "교감(생활)", "행정실장"];
 const WEEKDAY_KOR = ["일", "월", "화", "수", "목", "금", "토"];
 const MASTER_PASSWORD_DEFAULT = "1234";
@@ -144,28 +144,15 @@ function weekKeyOf(date) {
 
 const todaySeed = new Date();
 const seedYMD = (offset) => ymd(addDays(todaySeed, offset));
-const INITIAL_EVENTS = [
-  { id: "e1", date: seedYMD(0), dept: "교무기획", grade: "", content: "2학기 개학식(전교생 등교, 8:40 운동장 집합)", password: "1234" },
-  { id: "e2", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털 새싹캠프(9:00~12:00, A1실, 5~6학년 10명)", password: "1234" },
-  { id: "e3", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털 새싹캠프(9:30~11:30, 4-2 교실, 3~4학년 20명)", password: "1234" },
-  { id: "e4", date: seedYMD(-1), dept: "교무기획", grade: "", content: "기획위원회(15:30, 2층 회의실)", password: "1234" },
-  { id: "e5", date: seedYMD(-1), dept: "", grade: "5학년", content: "민속무용교육(외부강사, 1~5교시, 교실)", password: "1234" },
-  { id: "e6", date: seedYMD(0), dept: "진로인성안전", grade: "", content: "2학기 학급 임원선거 (3~6학년)", password: "1234" },
-  { id: "e7", date: seedYMD(0), dept: "특수교육운영", grade: "", content: "2학기 개별화교육지원팀 협의 (~8/31)", password: "1234" },
-  { id: "e8", date: seedYMD(0), dept: "", grade: "4학년", content: "학교폭력예방교육(외부강사, 1~2교시, 4개반씩, 교실)", password: "1234" },
-  { id: "e9", date: seedYMD(0), dept: "", grade: "6학년", content: "국악교육(1~5교시, 음악실)", password: "1234" },
-  { id: "e10", date: seedYMD(1), dept: "혁신연구", grade: "", content: "글빛마루 오프닝 행사(커팅식), 13:50~14:00", password: "1234" },
-  { id: "e11", date: seedYMD(1), dept: "문화과학", grade: "4학년", content: "4,5학년 영재 수업 시작", password: "1234" },
-  { id: "e12", date: seedYMD(1), dept: "행정실", grade: "", content: "소방종합점검 14:30~", password: "1234" }
-];
+const INITIAL_EVENTS = [];
 
 function buildInitialAdminWorkStatus() {
   const key = weekKeyOf(todaySeed);
   return {
     [key]: {
       "교장": "특이사항 없음",
-      "교감(교무)": "28(금) [출장] 서구3지구 교감단 자율장학협의회 (11:00~16:30, 청라커낼웨이 일대)",
-      "교감(생활)": "24(월) [출장] 유치원장 자격연수 (~28, 한국교원대학교)",
+      "교감(교무)": "특이사항 없음",
+      "교감(생활)": "특이사항 없음",
       "행정실장": "특이사항 없음"
     }
   };
