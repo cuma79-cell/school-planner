@@ -4,19 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>인천경연초등학교 학사ㆍ근무 현황 플래너</title>
-  <!-- Tailwind CSS & React CDN -->
+  <!-- Tailwind CSS & React & Supabase CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased font-sans">
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-violet-100 selection:text-violet-700">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo } = React;
+    // Supabase 설정 (URL에서 /rest/v1/ 경로 자동 정제)
+    const RAW_SUPABASE_URL = "https://ozflxmatleyttxwfrckb.supabase.co/rest/v1/";
+    const SUPABASE_URL = RAW_SUPABASE_URL.replace(/\/rest\/v1\/?$/, "");
+    
+    // 🔑 아래 "YOUR_SUPABASE_ANON_KEY_HERE" 대신 Supabase의 anon key를 붙여넣으세요.
+    // (웹 화면의 "DB 연동 설정" 버튼으로도 입력 가능합니다)
+    const DEFAULT_SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE";
 
-    // SVG 아이콘 컴포넌트 내장 정의 (외부 라이브러리 로딩 에러 방지)
+    const { useState, useMemo, useEffect, useCallback } = React;
+
     const ChevronLeft = ({ size = 18, className = "" }) => (
       <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     );
@@ -46,6 +62,9 @@
     );
     const PencilIcon = ({ size = 11, className = "" }) => (
       <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+    );
+    const KeyIcon = ({ size = 14, className = "" }) => (
+      <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3"/></svg>
     );
 
     const GRADES = ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
@@ -124,12 +143,11 @@
 
     const todaySeed = new Date();
     const seedYMD = (offset) => ymd(addDays(todaySeed, offset));
-
     const INITIAL_EVENTS = [
       { id: "e1", date: seedYMD(0), dept: "교무기획", grade: "", content: "2학기 개학식(전교생 등교, 8:40 운동장 집합)", password: "1234" },
-      { id: "e2", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털 새싹캠프(9:00~12:00, A1실, 5~6학년 10명)", password: "1234" },
-      { id: "e3", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털 새싹캠프(9:30~11:30, 4-2 교실, 3~4학년 20명)", password: "1234" },
-      { id: "e4", date: seedYMD(-1), dept: "교무기획", grade: "", content: "기획위원회(15:30, 2층 회의실)", password: "1234" },
+      { id: "e2", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털 새싹캠프 (9:00~12:00, A1실, 5~6학년 10명)", password: "1234" },
+      { id: "e3", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털 새싹캠프 (9:30~11:30, 4-2 교실, 3~4학년 20명)", password: "1234" },
+      { id: "e4", date: seedYMD(-1), dept: "교무기획", grade: "", content: "기획위원회 (15:30, 2층 회의실)", password: "1234" },
       { id: "e5", date: seedYMD(-1), dept: "", grade: "5학년", content: "민속무용교육(외부강사, 1~5교시, 교실)", password: "1234" },
       { id: "e6", date: seedYMD(0), dept: "진로인성안전", grade: "", content: "2학기 학급임원선거 (3~6학년)", password: "1234" },
       { id: "e7", date: seedYMD(0), dept: "특수교육운영", grade: "", content: "2학기 개별화교육지원팀 협의 (~8/31)", password: "1234" },
@@ -137,7 +155,7 @@
       { id: "e9", date: seedYMD(0), dept: "", grade: "6학년", content: "국악교육(1~5교시, 음악실)", password: "1234" },
       { id: "e10", date: seedYMD(1), dept: "혁신연구", grade: "", content: "글빛마루 오프닝 행사(커팅식), 13:50~14:00", password: "1234" },
       { id: "e11", date: seedYMD(1), dept: "문화과학", grade: "4학년", content: "4,5학년 영재 수업 시작", password: "1234" },
-      { id: "e12", date: seedYMD(1), dept: "행정실", grade: "", content: "소방종합점검 14:30~", password: "1234" },
+      { id: "e12", date: seedYMD(1), dept: "행정실", grade: "", content: "소방종합점검 14:30~", password: "1234" }
     ];
 
     function buildInitialAdminWorkStatus() {
@@ -145,7 +163,7 @@
       return {
         [key]: {
           "교장": "특이사항 없음",
-          "교감(교무)": "28(금) [출장] 서구3지구 교감단 자율장학협의회 (11:00~16:30, 청라커넬웨이 일대)",
+          "교감(교무)": "28(금) [출장] 서구3지구 교감단 자율장학협의회 (11:00~16:30, 청라커낼웨이 일대)",
           "교감(생활)": "24(월) [출장] 유치원장 자격연수 (~28, 한국교원대학교)",
           "행정실장": "특이사항 없음"
         }
@@ -163,10 +181,7 @@
     function Modal({ title, onClose, children, wide = false }) {
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onClose}>
-          <div
-            className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5`}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5`} onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-800">{title}</h3>
               <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
@@ -216,7 +231,7 @@
           </div>
           <button
             onClick={() => onAddEvent(dateStr)}
-            className="h-6 w-6 shrink-0 self-start rounded-full text-slate-300 hover:bg-violet-100 hover:text-violet-500 transition flex items-center justify-center"
+            className="flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-slate-300 transition hover:bg-violet-100 hover:text-violet-500"
             title="이 날짜에 일정 추가"
           >
             <PlusIcon size={16} />
@@ -234,12 +249,8 @@
               {editAction}
             </div>
             <div className="flex gap-1">
-              <button onClick={onAll} className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200">
-                일괄 선택
-              </button>
-              <button onClick={onNone} className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200">
-                일괄 해제
-              </button>
+              <button onClick={onAll} className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200">일괄 선택</button>
+              <button onClick={onNone} className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200">일괄 해제</button>
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -264,42 +275,105 @@
 
     function App() {
       const today = new Date();
-      const [tab, setTab] = useState("month"); // 'month' | 'week'
+      const [tab, setTab] = useState("month");
       const [viewDate, setViewDate] = useState(new Date());
       const [weekAnchor, setWeekAnchor] = useState(new Date());
 
-      // 부서 목록
-      const [depts, setDepts] = useState(INITIAL_DEPTS);
+      // Supabase Key State (localStorage 지원)
+      const [anonKey, setAnonKey] = useState(() => {
+        return localStorage.getItem("sp_anon_key") || DEFAULT_SUPABASE_ANON_KEY;
+      });
+      const [keyModalOpen, setKeyModalOpen] = useState(false);
+      const [keyInput, setKeyInput] = useState("");
 
-      // 필터
+      // Supabase Client 생성
+      const supabase = useMemo(() => {
+        if (window.supabase && SUPABASE_URL && anonKey && anonKey !== "YOUR_SUPABASE_ANON_KEY_HERE") {
+          try {
+            return window.supabase.createClient(SUPABASE_URL, anonKey);
+          } catch (err) {
+            console.error("Supabase client init error:", err);
+            return null;
+          }
+        }
+        return null;
+      }, [anonKey]);
+
+      // 앱 데이터 상태
+      const [depts, setDepts] = useState(INITIAL_DEPTS);
       const [selectedDepts, setSelectedDepts] = useState(new Set(INITIAL_DEPTS));
       const [selectedGrades, setSelectedGrades] = useState(new Set(GRADES));
-
-      // 일정 데이터
       const [events, setEvents] = useState(INITIAL_EVENTS);
+      const [adminWorkStatus, setAdminWorkStatus] = useState(buildInitialAdminWorkStatus());
+
+      // 모달 상태들
       const emptyForm = { date: ymd(today), dept: "", grade: "", content: "", password: "" };
-      const [eventModal, setEventModal] = useState(null); // { mode: 'add' | 'edit', data? }
+      const [eventModal, setEventModal] = useState(null);
       const [form, setForm] = useState(emptyForm);
       const [pwCheckInput, setPwCheckInput] = useState("");
       const [pwCheckError, setPwCheckError] = useState("");
 
-      // 마스터 비밀번호
       const [masterPassword] = useState(MASTER_PASSWORD_DEFAULT);
-
-      // 관리자 근무 현황
-      const [adminWorkStatus, setAdminWorkStatus] = useState(buildInitialAdminWorkStatus());
-      const [adminModalStage, setAdminModalStage] = useState(null); // null | 'password' | 'edit'
+      const [adminModalStage, setAdminModalStage] = useState(null);
       const [adminPwInput, setAdminPwInput] = useState("");
       const [adminPwError, setAdminPwError] = useState("");
       const [adminFormTexts, setAdminFormTexts] = useState({});
 
-      // 부서명 수정
-      const [deptModalStage, setDeptModalStage] = useState(null); // null | 'password' | 'edit'
+      const [deptModalStage, setDeptModalStage] = useState(null);
       const [deptPwInput, setDeptPwInput] = useState("");
       const [deptPwError, setDeptPwError] = useState("");
       const [deptEditRows, setDeptEditRows] = useState([]);
 
-      /* 파생 데이터 */
+      // DB에서 데이터 불러오기
+      const fetchAllData = useCallback(async () => {
+        if (!supabase) return;
+
+        // 1. Events 불러오기
+        try {
+          const { data: dbEvents, error: evErr } = await supabase.from('events').select('*');
+          if (!evErr && dbEvents) {
+            setEvents(dbEvents);
+          }
+        } catch(e) { console.error("Error fetching events:", e); }
+
+        // 2. Depts 불러오기
+        try {
+          const { data: dbDepts, error: deptErr } = await supabase.from('depts').select('*').order('id', { ascending: true });
+          if (!deptErr && dbDepts && dbDepts.length > 0) {
+            const deptNames = dbDepts.map(d => d.name);
+            setDepts(deptNames);
+            setSelectedDepts(new Set(deptNames));
+          }
+        } catch(e) { console.error("Error fetching depts:", e); }
+
+        // 3. Admin Status 불러오기
+        try {
+          const { data: dbAdmin, error: adminErr } = await supabase.from('admin_status').select('*');
+          if (!adminErr && dbAdmin) {
+            const map = {};
+            dbAdmin.forEach(item => { map[item.week_key] = item.data; });
+            setAdminWorkStatus(map);
+          }
+        } catch(e) { console.error("Error fetching admin status:", e); }
+      }, [supabase]);
+
+      useEffect(() => {
+        fetchAllData();
+
+        if (supabase) {
+          // 실시간 데이터 변경 구독
+          const channel = supabase.channel('realtime-planner')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => fetchAllData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'depts' }, () => fetchAllData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_status' }, () => fetchAllData())
+            .subscribe();
+
+          return () => {
+            supabase.removeChannel(channel);
+          };
+        }
+      }, [supabase, fetchAllData]);
+
       const filteredEvents = useMemo(() => {
         return events.filter((e) => {
           const deptOk = e.dept === "" || selectedDepts.has(e.dept);
@@ -326,7 +400,6 @@
       const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} ~ ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
       const currentWeekTexts = adminWorkStatus[weekKey] || {};
 
-      /* 필터 핸들러 */
       const toggleInSet = (set, setter, value) => {
         const next = new Set(set);
         if (next.has(value)) next.delete(value);
@@ -334,7 +407,6 @@
         setter(next);
       };
 
-      /* 날짜 이동 핸들러 */
       const goPrev = () => (tab === "month" ? setViewDate((d) => addMonths(d, -1)) : setWeekAnchor((d) => addDays(d, -7)));
       const goNext = () => (tab === "month" ? setViewDate((d) => addMonths(d, 1)) : setWeekAnchor((d) => addDays(d, 7)));
       const goToday = () => {
@@ -342,7 +414,6 @@
         else setWeekAnchor(new Date());
       };
 
-      /* 일정 핸들러 */
       const openAddEvent = (dateStr) => {
         setForm({ ...emptyForm, date: dateStr || ymd(today) });
         setPwCheckInput("");
@@ -360,7 +431,7 @@
       const closeEventModal = () => setEventModal(null);
       const isValidPw = (v) => /^\d{4}$/.test(v);
 
-      const saveEvent = () => {
+      const saveEvent = async () => {
         if (!form.content.trim()) return;
         if (eventModal.mode === "add") {
           if (!isValidPw(form.password)) {
@@ -368,6 +439,11 @@
             return;
           }
           const newEv = { id: `e${Date.now()}`, ...form };
+
+          // DB에 저장
+          if (supabase) {
+            await supabase.from('events').insert([newEv]);
+          }
           setEvents((prev) => [...prev, newEv]);
           closeEventModal();
         } else {
@@ -375,21 +451,30 @@
             setPwCheckError("비밀번호가 일치하지 않습니다.");
             return;
           }
+
+          // DB에 업데이트
+          if (supabase) {
+            await supabase.from('events').update(form).eq('id', eventModal.data.id);
+          }
           setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...form } : e)));
           closeEventModal();
         }
       };
 
-      const deleteEvent = () => {
+      const deleteEvent = async () => {
         if (pwCheckInput !== eventModal.data.password) {
           setPwCheckError("비밀번호가 일치하지 않습니다.");
           return;
+        }
+
+        // DB에서 삭제
+        if (supabase) {
+          await supabase.from('events').delete().eq('id', eventModal.data.id);
         }
         setEvents((prev) => prev.filter((e) => e.id !== eventModal.data.id));
         closeEventModal();
       };
 
-      /* 관리자 근무 현황 핸들러 */
       const openAdminInput = () => {
         setAdminPwInput("");
         setAdminPwError("");
@@ -407,17 +492,20 @@
         setAdminModalStage("edit");
       };
 
-      const saveAdminTexts = () => {
+      const saveAdminTexts = async () => {
+        const updatedData = { ...adminFormTexts };
+        if (supabase) {
+          await supabase.from('admin_status').upsert([{ week_key: weekKey, data: updatedData }]);
+        }
         setAdminWorkStatus((prev) => ({
           ...prev,
-          [weekKey]: { ...adminFormTexts }
+          [weekKey]: updatedData
         }));
         setAdminModalStage(null);
       };
 
       const closeAdminModal = () => setAdminModalStage(null);
 
-      /* 부서명 수정 핸들러 */
       const openDeptEdit = () => {
         setDeptPwInput("");
         setDeptPwError("");
@@ -445,7 +533,7 @@
         setDeptEditRows((prev) => prev.filter((r) => r.key !== key));
       };
 
-      const saveDeptEdits = () => {
+      const saveDeptEdits = async () => {
         const renameMap = {};
         depts.forEach((oldName, i) => {
           const row = deptEditRows.find((r) => r.key === `i${i}`);
@@ -454,6 +542,12 @@
 
         const newDepts = deptEditRows.map((r) => r.value.trim()).filter((v) => v.length > 0);
         const dedupedNewDepts = Array.from(new Set(newDepts));
+
+        // DB에 부서 정보 갱신
+        if (supabase) {
+          await supabase.from('depts').delete().neq('id', -1);
+          await supabase.from('depts').insert(dedupedNewDepts.map(name => ({ name })));
+        }
 
         setEvents((prev) =>
           prev.map((e) => {
@@ -481,18 +575,56 @@
 
       const closeDeptModal = () => setDeptModalStage(null);
 
+      // Key Modal 저장
+      const handleSaveKey = () => {
+        if (!keyInput.trim()) return;
+        const cleanKey = keyInput.trim();
+        localStorage.setItem("sp_anon_key", cleanKey);
+        setAnonKey(cleanKey);
+        setKeyModalOpen(false);
+      };
+
       return (
         <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-24 sm:p-6">
           <div className="mx-auto max-w-3xl">
+            {/* DB 연결 경고 및 키 등록 바 */}
+            {(!supabase) && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-amber-50 p-3.5 border border-amber-200 text-xs text-amber-800">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-amber-600">⚠️ DB 미연동:</span>
+                  <span>Supabase Key가 입력되지 않았습니다. 다른 사람과 공유하려면 anon key를 설정해 주세요.</span>
+                </div>
+                <button
+                  onClick={() => { setKeyInput(anonKey === DEFAULT_SUPABASE_ANON_KEY ? "" : anonKey); setKeyModalOpen(true); }}
+                  className="flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 font-bold text-white hover:bg-amber-700 transition"
+                >
+                  <KeyIcon size={14} /> DB 연동 설정
+                </button>
+              </div>
+            )}
+
             {/* 헤더 */}
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500 text-white shadow-sm shadow-violet-200">
-                <SparklesIcon size={20} />
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500 text-white shadow-sm shadow-violet-200">
+                  <SparklesIcon size={20} />
+                </div>
+                <div>
+                  <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">초등 학사·근무 현황 플래너</h1>
+                  <p className="text-xs text-slate-400">학년·부서별 일정과 관리자 근무 현황을 실시간 공유</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">초등 학사ㆍ근무 현황 플래너</h1>
-                <p className="text-xs text-slate-400">학년 부서별 일정과 관리자 근무 현황을 한눈에</p>
-              </div>
+
+              {supabase && (
+                <button
+                  onClick={() => { setKeyInput(anonKey); setKeyModalOpen(true); }}
+                  className="flex items-center gap-1 rounded-xl bg-emerald-100 px-2.5 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-200 transition"
+                  title="Supabase 실시간 연동 상태입니다"
+                >
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  실시간 연동 중
+                </button>
+              )}
             </div>
 
             {/* 탭 & 날짜 이동 */}
@@ -602,7 +734,7 @@
                   ))}
                 </div>
 
-                {/* 관리자 근무 현황 카드 (주간 업무 하단) */}
+                {/* 관리자 근무 현황 카드 */}
                 <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -631,6 +763,35 @@
                   </div>
                 </div>
               </>
+            )}
+
+            {/* 키 설정 모달 */}
+            {keyModalOpen && (
+              <Modal title="Supabase API Anon Key 설정" onClose={() => setKeyModalOpen(false)} wide>
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Supabase 대시보드 ➔ <b>Project Settings</b> ➔ <b>API</b> 메뉴에서 복사한 <b>anon (public)</b> 키를 아래에 입력해주세요.
+                  </p>
+                  <div>
+                    <FieldLabel>Anon Key</FieldLabel>
+                    <textarea
+                      rows={4}
+                      value={keyInput}
+                      onChange={(e) => setKeyInput(e.target.value)}
+                      className={inputCls}
+                      placeholder="eyJhbGciOiJKV1QiLC..."
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <button onClick={() => setKeyModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">
+                      취소
+                    </button>
+                    <button onClick={handleSaveKey} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">
+                      저장 및 연동
+                    </button>
+                  </div>
+                </div>
+              </Modal>
             )}
 
             {/* 일정 추가/수정 모달 */}
@@ -708,16 +869,10 @@
                         <Trash2Icon size={15} /> 삭제
                       </button>
                     )}
-                    <button
-                      onClick={closeEventModal}
-                      className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"
-                    >
+                    <button onClick={closeEventModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">
                       취소
                     </button>
-                    <button
-                      onClick={saveEvent}
-                      className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"
-                    >
+                    <button onClick={saveEvent} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">
                       {eventModal.mode === "add" ? "추가" : "수정"}
                     </button>
                   </div>
@@ -725,7 +880,7 @@
               </Modal>
             )}
 
-            {/* 관리자 근무 현황: 비밀번호 확인 모달 */}
+            {/* 관리자 근무 현황: 비밀번호 모달 */}
             {adminModalStage === "password" && (
               <Modal title="관리자 인증" onClose={closeAdminModal}>
                 <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -758,7 +913,7 @@
                         onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
                         rows={2}
                         className={inputCls}
-                        placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회(11:00~16:30, 청라커넬웨이 일대)"
+                        placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회(11:00~16:30, 청라커낼웨이 일대)"
                       />
                     </div>
                   ))}
@@ -774,7 +929,7 @@
               </Modal>
             )}
 
-            {/* 부서명 수정: 비밀번호 확인 모달 */}
+            {/* 부서명 수정: 비밀번호 모달 */}
             {deptModalStage === "password" && (
               <Modal title="마스터 인증" onClose={closeDeptModal}>
                 <FieldLabel>마스터 비밀번호</FieldLabel>
