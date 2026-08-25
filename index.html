@@ -255,7 +255,7 @@ function App() {
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [keyInput, setKeyInput] = useState("");
 
-  // 마스터 비밀번호 관리 (localStorage 연동)
+  // 마스터 비밀번호 상태
   const [masterPassword, setMasterPassword] = useState(() => {
     return localStorage.getItem("sp_master_pw") || MASTER_PASSWORD_DEFAULT;
   });
@@ -400,6 +400,7 @@ function App() {
   const closeEventModal = () => setEventModal(null);
   const isValidPw = (v) => /^\d{4}$/.test(v);
 
+  // 일정 저장 (마스터 비밀번호로도 인증 허용)
   const saveEvent = async () => {
     if (!form.content.trim()) return;
     if (eventModal.mode === "add") {
@@ -419,6 +420,7 @@ function App() {
       setEvents((prev) => [...prev, newEv]);
       closeEventModal();
     } else {
+      // 등록 비밀번호 또는 마스터 비밀번호가 맞는지 확인
       if (pwCheckInput !== eventModal.data.password && pwCheckInput !== masterPassword) {
         setPwCheckError("비밀번호가 일치하지 않습니다.");
         return;
@@ -435,7 +437,9 @@ function App() {
     }
   };
 
+  // 일정 삭제 (마스터 비밀번호로도 인증 허용)
   const deleteEvent = async () => {
+    // 등록 비밀번호 또는 마스터 비밀번호가 맞는지 확인
     if (pwCheckInput !== eventModal.data.password && pwCheckInput !== masterPassword) {
       setPwCheckError("비밀번호가 일치하지 않습니다.");
       return;
@@ -451,7 +455,6 @@ function App() {
     closeEventModal();
   };
 
-  // 마스터 비밀번호 모달 관련 함수
   const openMasterPwModal = () => {
     setCurrentPwInput("");
     setNewPwInput("");
@@ -628,7 +631,7 @@ function App() {
           )}
         </div>
 
-        {/* 3. [실시간 연동 중] 아래 / [오늘] 위 우측 정렬 마스터 PW 변경 버튼 */}
+        {/* 마스터 PW 변경 버튼 */}
         <div className="mb-2 flex justify-end">
           <button
             onClick={openMasterPwModal}
@@ -775,7 +778,6 @@ function App() {
                 </button>
               </div>
 
-              {/* 2. 취소와 변경 밑에 비밀번호 초기화 버튼 */}
               <div className="pt-2">
                 <button
                   onClick={handleResetMasterPassword}
@@ -788,6 +790,7 @@ function App() {
           </Modal>
         )}
 
+        {/* 2. Supabase API Anon Key 모달 */}
         {keyModalOpen && (
           <Modal title="Supabase API Anon Key 설정" onClose={() => setKeyModalOpen(false)} wide>
             <div className="space-y-3">
@@ -806,6 +809,7 @@ function App() {
           </Modal>
         )}
 
+        {/* 3. 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={closeEventModal} wide>
             <div className="space-y-3">
@@ -840,8 +844,8 @@ function App() {
                 </div>
               ) : (
                 <div>
-                  <FieldLabel>비밀번호 (숫자 4자리)</FieldLabel>
-                  <input type="password" inputMode="numeric" maxLength={4} value={pwCheckInput} onChange={(e) => setPwCheckInput(e.target.value.replace(/\D/g, "").slice(0, 4))} className={inputCls} placeholder="등록 시 설정한 비밀번호" />
+                  <FieldLabel>비밀번호 (등록 비밀번호 또는 마스터 PW)</FieldLabel>
+                  <input type="password" value={pwCheckInput} onChange={(e) => setPwCheckInput(e.target.value)} className={inputCls} placeholder="비밀번호 입력" />
                 </div>
               )}
               {pwCheckError && <p className="text-xs font-semibold text-rose-500">{pwCheckError}</p>}
@@ -858,6 +862,7 @@ function App() {
           </Modal>
         )}
 
+        {/* 4. 관리자 근무 현황 인증 모달 */}
         {adminModalStage === "password" && (
           <Modal title="관리자 인증" onClose={closeAdminModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -868,6 +873,7 @@ function App() {
           </Modal>
         )}
 
+        {/* 5. 관리자 근무 현황 작성 모달 */}
         {adminModalStage === "edit" && (
           <Modal title={`관리자 근무 현황 작성 (${weekLabel})`} onClose={closeAdminModal} wide>
             <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
@@ -885,6 +891,7 @@ function App() {
           </Modal>
         )}
 
+        {/* 6. 부서명 수정 인증 모달 */}
         {deptModalStage === "password" && (
           <Modal title="마스터 인증" onClose={closeDeptModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -895,6 +902,7 @@ function App() {
           </Modal>
         )}
 
+        {/* 7. 부서명 수정 편집 모달 */}
         {deptModalStage === "edit" && (
           <Modal title="담당 부서명 수정" onClose={closeDeptModal} wide>
             <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
