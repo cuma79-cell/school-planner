@@ -27,7 +27,7 @@ const RAW_SUPABASE_URL = "https://ozflxmatleyttxwfrckb.supabase.co/rest/v1/";
 const SUPABASE_URL = RAW_SUPABASE_URL.replace(/\/rest\/v1\/?$/, "");
 const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96Zmx4bWF0bGV5dHR4d2ZyY2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDY5ODgsImV4cCI6MjEwMzIyMjk4OH0.S4hWR5krOBKlQNhGqe5phNxvyoy8E1H32WoODrC_5l0";
 
-const { useState, useMemo, useEffect, useCallback } = React;
+const { useState, useMemo, useEffect, useCallback, useRef } = React;
 
 const FIXED_HOLIDAYS = {
   "01-01": "신정",
@@ -94,7 +94,7 @@ const KeyIcon = ({ size = 14, className = "" }) => (
 );
 
 const GRADES = ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
-const INITIAL_DEPTS = ["교무기획", "정보", "혁신연구", "진로인성안전", "특수교육운영", "문화과학", "학생생활", "과학환경", "행정실", "늘봄지원"];
+const INITIAL_DEPTS = ["교무기획", "교육정보", "교육연구", "안전자치", "특수교육", "문화체육", "학생생활", "과학환경", "행정실", "늘봄지원"];
 const ADMIN_ROLES = ["교장", "교감(교무)", "교감(생활)", "행정실장"];
 const WEEKDAY_KOR = ["일", "월", "화", "수", "목", "금", "토"];
 const MASTER_PASSWORD_DEFAULT = "1234";
@@ -334,17 +334,18 @@ function App() {
   const [events, setEvents] = useState([]);
   const [adminWorkStatus, setAdminWorkStatus] = useState({});
 
+  const isFirstDeptsLoadedRef = useRef(false);
+
   const emptyForm = { date: ymd(today), dept: "", grade: "", content: "", password: "" };
   const [eventModal, setEventModal] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [pwCheckInput, setPwCheckInput] = useState("");
   const [pwCheckError, setPwCheckError] = useState("");
 
-  // 관리자 근무 입력 모달 상태
   const [adminModalStage, setAdminModalStage] = useState(null);
   const [adminTargetRole, setAdminTargetRole] = useState(null);
   const [adminTargetDate, setAdminTargetDate] = useState(ymd(today));
-  const [adminSharedRoles, setAdminSharedRoles] = useState(new Set()); // 동행 관리자 선택 상태
+  const [adminSharedRoles, setAdminSharedRoles] = useState(new Set());
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
   const [adminFormTexts, setAdminFormTexts] = useState({});
@@ -365,13 +366,19 @@ function App() {
       if (dbDepts && dbDepts.length > 0) {
         const deptNames = dbDepts.map(d => d.name);
         setDepts(deptNames);
-        setSelectedDepts(prevSelected => {
-          const next = new Set();
-          prevSelected.forEach(d => {
-            if (deptNames.includes(d)) next.add(d);
+        
+        if (!isFirstDeptsLoadedRef.current) {
+          setSelectedDepts(new Set(deptNames));
+          isFirstDeptsLoadedRef.current = true;
+        } else {
+          setSelectedDepts(prevSelected => {
+            const next = new Set();
+            prevSelected.forEach(d => {
+              if (deptNames.includes(d)) next.add(d);
+            });
+            return next;
           });
-          return next;
-        });
+        }
       }
     } catch(e) { console.error("Error fetching depts:", e); }
     try {
@@ -439,15 +446,16 @@ function App() {
   const modalWeekCalculated = useMemo(() => {
     try {
       const d = new Date(adminTargetDate);
-      if (isNaN(d.getTime())) return { key: weekKey, label: weekLabel };
+      if (isNaN(d.getTime())) return { key: weekKey, label: weekLabel, dayStr: "" };
       const wDates = getWeekdays(d);
       const wSt = wDates[0];
       const wEn = wDates[4];
       const wK = ymd(wSt);
       const wLbl = `${wSt.getMonth() + 1}/${wSt.getDate()} ~ ${wEn.getMonth() + 1}/${wEn.getDate()}`;
-      return { key: wK, label: wLbl };
+      const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
+      return { key: wK, label: wLbl, dayStr };
     } catch {
-      return { key: weekKey, label: weekLabel };
+      return { key: weekKey, label: weekLabel, dayStr: "" };
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
@@ -671,14 +679,29 @@ function App() {
     setAdminModalStage("edit");
   };
 
+  // 날짜 접두어(예: 7(월)) 포맷팅 헬퍼
+  const formatAdminTextWithDate = (rawText) => {
+    const trimmed = (rawText || "").trim();
+    if (!trimmed) return "";
+    const prefix = modalWeekCalculated.dayStr; // 예: "7(목)"
+    if (!prefix) return trimmed;
+    
+    // 이미 해당 날짜 접두어나 다른 날짜 형식(예: 7(목), 11(금))으로 시작하면 중복 추가 방지
+    const hasDatePrefix = /^\d{1,2}\s*\([월화수목금토일]\)/.test(trimmed);
+    if (hasDatePrefix) {
+      return trimmed;
+    }
+    return `${prefix} ${trimmed}`;
+  };
+
   const saveAdminTexts = async () => {
     const updatedData = { ...adminFormTexts };
 
-    // 동행 관리자가 선택된 경우 해당 역할들에게 동일한 텍스트 복사 적용
     if (adminTargetRole && adminTargetRole !== 'ALL') {
-      const textToCopy = adminFormTexts[adminTargetRole] || "";
+      const formatted = formatAdminTextWithDate(adminFormTexts[adminTargetRole]);
+      updatedData[adminTargetRole] = formatted;
       adminSharedRoles.forEach((sharedRole) => {
-        updatedData[sharedRole] = textToCopy;
+        updatedData[sharedRole] = formatted;
       });
     }
 
@@ -737,17 +760,7 @@ function App() {
       return { ...e, dept: mapped || "" };
     }));
 
-    setSelectedDepts((prev) => {
-      const next = new Set();
-      prev.forEach((d) => {
-        const mapped = Object.prototype.hasOwnProperty.call(renameMap, d) ? renameMap[d] : d;
-        if (mapped) next.add(mapped);
-      });
-      dedupedNewDepts.forEach((nd) => {
-        if (!depts.includes(nd)) next.add(nd);
-      });
-      return next;
-    });
+    setSelectedDepts(new Set(dedupedNewDepts));
     setDepts(dedupedNewDepts);
     setDeptModalStage(null);
   };
@@ -1174,7 +1187,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 6. 관리자 근무 현황 작성 모달 (동행 관리자 선택 기능 탑재) */}
+        {/* 6. 관리자 근무 현황 작성 모달 */}
         {adminModalStage === "edit" && (
           <Modal
             title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성` : `관리자 근무 현황 작성`}
@@ -1184,7 +1197,7 @@ function App() {
             <div className="mb-4 rounded-xl bg-violet-50/70 p-3 border border-violet-100 space-y-2.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <FieldLabel>기준 날짜 (해당 주간 자동 지정)</FieldLabel>
+                  <FieldLabel>기준 날짜 (해당 일자가 내용 앞에 자동 표시)</FieldLabel>
                   <input
                     type="date"
                     value={adminTargetDate}
@@ -1194,11 +1207,12 @@ function App() {
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] font-bold text-slate-400 block">적용 주간</span>
-                  <span className="text-xs font-extrabold text-violet-600">{modalWeekCalculated.label}</span>
+                  <span className="text-xs font-extrabold text-violet-600">
+                    {modalWeekCalculated.label} {modalWeekCalculated.dayStr && `[${modalWeekCalculated.dayStr}]`}
+                  </span>
                 </div>
               </div>
 
-              {/* 동행 관리자 체크박스 (개별 직책 편집 시 표시) */}
               {adminTargetRole && adminTargetRole !== 'ALL' && (
                 <div className="pt-2 border-t border-violet-200/60">
                   <p className="text-[11px] font-bold text-violet-700 mb-1.5">동행 관리자 함께 등록 (선택 시 동일 내용이 함께 저장됩니다)</p>
@@ -1234,7 +1248,7 @@ function App() {
                     onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
                     rows={adminTargetRole && adminTargetRole !== 'ALL' ? 4 : 2}
                     className={inputCls}
-                    placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회"
+                    placeholder="예) 11:45~16:30 교장 자율장학 (날짜를 직접 적지 않아도 기준 날짜가 앞에 자동 추가됩니다)"
                   />
                 </div>
               ))}
