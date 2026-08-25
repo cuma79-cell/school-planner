@@ -12,7 +12,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 <style>
-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { font-family: 'Inter', sans-serif; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
@@ -23,14 +23,16 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Robo
 <div id="root"></div>
 
 <script type="text/babel">
-// Supabase 설정
+// Supabase 설정 (URL에서 /rest/v1/ 경로 자동 정제)
 const RAW_SUPABASE_URL = "https://ozflxmatleyttxwfrckb.supabase.co/rest/v1/";
 const SUPABASE_URL = RAW_SUPABASE_URL.replace(/\/rest\/v1\/?$/, "");
+
 const DEFAULT_SUPABASE_ANON_KEY =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96Zmx4bWF0bGV5dHR4d2ZyY2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDY5ODgsImV4cCI6MjEwMzl2Mjk4OH0.S4hWR5krOBKIQNhGqe5phNxvyoy8E1H32WOODrC_510";
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96Zmx4bWF0bGV5dHR4d2ZyY2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDY5ODgsImV4cCI6MjEwMzk2Mjk4OH0.S4hWR5krOBKIQNhGqe5phNxvyoy8E1H32WOODrC_510";
 
 const { useState, useMemo, useEffect, useCallback } = React;
 
+// 아이콘 컴포넌트
 const ChevronLeft = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
 );
@@ -49,8 +51,8 @@ const Trash2Icon = ({ size = 15, className = "" }) => (
 const LockIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 );
-const ShieldCheckIcon = ({ size = 15, className = "" }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+const ShieldCheckIcon = ({ size = 14, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
 );
 const CalendarDaysIcon = ({ size = 15, className = "" }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
@@ -66,7 +68,7 @@ const KeyIcon = ({ size = 14, className = "" }) => (
 );
 
 const GRADES = ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
-const INITIAL_DEPTS = ["교무기획", "교육정보", "교육연구", "안전자치", "특수교육", "문화체육", "학생활", "과학환경", "행정실", "늘봄지원"];
+const INITIAL_DEPTS = ["교무기획", "교육정보", "교육연구", "안전자치", "특수교육", "문화체육", "학생생활", "과학환경", "행정실", "늘봄지원"];
 const ADMIN_ROLES = ["교장", "교감(교무)", "교감(생활)", "행정실장"];
 const WEEKDAY_KOR = ["일", "월", "화", "수", "목", "금", "토"];
 const MASTER_PASSWORD_DEFAULT = "1234";
@@ -142,20 +144,11 @@ function weekKeyOf(date) {
   return ymd(startOfWeekMon(date));
 }
 
-const todaySeed = new Date();
-const seedYMD = (offset) => ymd(addDays(todaySeed, offset));
+// 초기 샘플 일정 데이터 (기본적으로 비워둠)
 const INITIAL_EVENTS = [];
 
 function buildInitialAdminWorkStatus() {
-  const key = weekKeyOf(todaySeed);
-  return {
-    [key]: {
-      "교장": "특이사항 없음",
-      "교감(교무)": "특이사항 없음",
-      "교감(생활)": "특이사항 없음",
-      "행정실장": "특이사항 없음"
-    }
-  };
+  return {};
 }
 
 function Badge({ className = "", children }) {
@@ -186,12 +179,13 @@ function FieldLabel({ children }) {
   return <label className="mb-1 block text-xs font-semibold text-slate-500">{children}</label>;
 }
 
-const inputCls = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100";
+const inputCls = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100 transition";
 
 function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent }) {
   const dateStr = ymd(date);
   const dow = date.getDay();
   const isToday = sameDay(date, today);
+
   const rowBg = isToday ? "bg-emerald-50/70" : dow === 0 ? "bg-rose-50/40" : dow === 6 ? "bg-blue-50/30" : "bg-white";
   const dateColor = isToday ? "text-emerald-600" : dow === 0 ? "text-rose-400" : dow === 6 ? "text-blue-400" : "text-slate-500";
 
@@ -201,15 +195,16 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent }) {
         {date.getDate()}
         <span className="text-xs font-bold">({WEEKDAY_KOR[dow]})</span>
       </div>
+
       <div className="min-w-0 flex-1 space-y-1.5">
         {events.length === 0 ? (
-          <p className="pt-0.5 text-xs text-slate-200">-</p>
+          <p className="pt-0.5 text-xs text-slate-300">-</p>
         ) : (
           events.map((ev) => (
             <button
               key={ev.id}
               onClick={() => onOpenEvent(ev)}
-              className="flex w-full items-start gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-50"
+              className="flex w-full items-start gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-100/80 transition"
             >
               <Badge className={getTagStyle(tagLabel(ev))}>{tagLabel(ev)}</Badge>
               <span className="pt-0.5 text-[13px] leading-snug text-slate-600">{ev.content}</span>
@@ -217,6 +212,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent }) {
           ))
         )}
       </div>
+
       <button
         onClick={() => onAddEvent(dateStr)}
         className="flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-slate-300 transition hover:bg-violet-100 hover:text-violet-500"
@@ -267,8 +263,8 @@ function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [weekAnchor, setWeekAnchor] = useState(new Date());
 
-  // 교표 로딩 오류 상태 (이미지 로딩 실패 시 예쁜 뱃지로 자동 대치)
-  const [logoErr, setLogoErr] = useState(false);
+  // 이미지 실패 시 Fallback
+  const [logoError, setLogoError] = useState(false);
 
   // Supabase Key State
   const [anonKey, setAnonKey] = useState(() => {
@@ -277,18 +273,16 @@ function App() {
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [keyInput, setKeyInput] = useState("");
 
-  // Master Password State (localStorage 저장, 기본: 1234)
+  // 마스터 비밀번호 관리 (localStorage 연동)
   const [masterPassword, setMasterPassword] = useState(() => {
     return localStorage.getItem("sp_master_pw") || MASTER_PASSWORD_DEFAULT;
   });
-
-  // Master Password Modal States
   const [masterPwModalOpen, setMasterPwModalOpen] = useState(false);
-  const [currPwInput, setCurrPwInput] = useState("");
+  const [currentPwInput, setCurrentPwInput] = useState("");
   const [newPwInput, setNewPwInput] = useState("");
-  const [confirmPwInput, setConfirmPwInput] = useState("");
-  const [pwChangeError, setPwChangeError] = useState("");
-  const [pwChangeSuccess, setPwChangeSuccess] = useState("");
+  const [newPwConfirmInput, setNewPwConfirmInput] = useState("");
+  const [masterPwError, setMasterPwError] = useState("");
+  const [masterPwSuccess, setMasterPwSuccess] = useState("");
 
   // Supabase Client 생성
   const supabase = useMemo(() => {
@@ -327,11 +321,17 @@ function App() {
   const [deptPwError, setDeptPwError] = useState("");
   const [deptEditRows, setDeptEditRows] = useState([]);
 
+  // DB에서 데이터 불러오기
   const fetchAllData = useCallback(async () => {
     if (!supabase) return;
+
     try {
       const { data: dbEvents, error: evErr } = await supabase.from('events').select('*');
-      if (!evErr && dbEvents) setEvents(dbEvents);
+      if (!evErr && dbEvents) {
+        setEvents(dbEvents);
+      } else if (evErr) {
+        console.error("Error fetching events:", evErr);
+      }
     } catch(e) { console.error("Error fetching events:", e); }
 
     try {
@@ -353,44 +353,37 @@ function App() {
     } catch(e) { console.error("Error fetching admin status:", e); }
   }, [supabase]);
 
+  // 주기적 자동 폴링 (5초마다 DB 최신화) & 실시간 동기화
   useEffect(() => {
     fetchAllData();
-    if (supabase) {
-      const interval = setInterval(() => {
-        fetchAllData();
-      }, 5000);
+    if (!supabase) return;
 
-      let channel = null;
-      try {
-        channel = supabase.channel('realtime-planner')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => fetchAllData())
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'depts' }, () => fetchAllData())
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_status' }, () => fetchAllData());
+    // 5초 간격 다중 디바이스 동기화 폴링
+    const pollInterval = setInterval(() => {
+      fetchAllData();
+    }, 5000);
 
-        channel.subscribe((status) => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn("Supabase Realtime fallback to HTTP polling active.");
-          }
-        });
-      } catch (err) {
-        console.warn("Polling fallback active.", err);
-      }
-
-      return () => {
-        clearInterval(interval);
-        if (channel && supabase) {
-          try {
-            supabase.removeChannel(channel);
-          } catch (e) {}
-        }
-      };
+    let channel = null;
+    try {
+      channel = supabase.channel('realtime-planner')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => fetchAllData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'depts' }, () => fetchAllData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_status' }, () => fetchAllData())
+        .subscribe();
+    } catch (e) {
+      console.warn("Realtime WebSocket connection fallback active.", e);
     }
+
+    return () => {
+      clearInterval(pollInterval);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [supabase, fetchAllData]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
-      const deptOk = e.dept === "" || selectedDepts.has(e.dept);
-      const gradeOk = e.grade === "" || selectedGrades.has(e.grade);
+      const deptOk = !e.dept || selectedDepts.has(e.dept);
+      const gradeOk = !e.grade || selectedGrades.has(e.grade);
       return deptOk && gradeOk;
     });
   }, [events, selectedDepts, selectedGrades]);
@@ -406,6 +399,7 @@ function App() {
 
   const monthDays = getMonthDays(viewDate);
   const monthLabel = `${viewDate.getFullYear()}년 ${viewDate.getMonth() + 1}월`;
+
   const weekDates = getWeekdays(weekAnchor);
   const weekStart = weekDates[0];
   const weekEnd = weekDates[4];
@@ -435,7 +429,7 @@ function App() {
   };
 
   const openEditEvent = (ev) => {
-    setForm({ date: ev.date, dept: ev.dept, grade: ev.grade, content: ev.content, password: ev.password });
+    setForm({ date: ev.date, dept: ev.dept || "", grade: ev.grade || "", content: ev.content, password: ev.password });
     setPwCheckInput("");
     setPwCheckError("");
     setEventModal({ mode: "edit", data: ev });
@@ -444,97 +438,143 @@ function App() {
   const closeEventModal = () => setEventModal(null);
   const isValidPw = (v) => /^\d{4}$/.test(v);
 
+  // 일정 저장/수정 로직
   const saveEvent = async () => {
     if (!form.content.trim()) return;
+
     if (eventModal.mode === "add") {
       if (!isValidPw(form.password)) {
         setPwCheckError("비밀번호는 숫자 4자리로 설정해 주세요.");
         return;
       }
-      const newEv = { id: `e${Date.now()}`, ...form };
+
       if (supabase) {
-        await supabase.from('events').insert([newEv]);
+        // Supabase DB에 객체 전송
+        const payload = {
+          date: form.date,
+          dept: form.dept || null,
+          grade: form.grade || null,
+          content: form.content,
+          password: form.password
+        };
+
+        const { data, error } = await supabase.from('events').insert([payload]).select();
+
+        if (error) {
+          console.error("Supabase insert error:", error);
+          setPwCheckError(`DB 저장 실패: ${error.message} (Supabase 테이블 설정 확인 필요)`);
+          return; // DB 저장이 실패하면 창을 닫지 않고 사용자에게 오류를 알림
+        }
+
+        if (data && data.length > 0) {
+          setEvents((prev) => [...prev, data[0]]);
+        } else {
+          await fetchAllData();
+        }
+      } else {
+        const localEv = { id: `e${Date.now()}`, ...form };
+        setEvents((prev) => [...prev, localEv]);
       }
-      setEvents((prev) => [...prev, newEv]);
       closeEventModal();
     } else {
-      if (pwCheckInput !== eventModal.data.password) {
+      // 수정 모드
+      if (pwCheckInput !== eventModal.data.password && pwCheckInput !== masterPassword) {
         setPwCheckError("비밀번호가 일치하지 않습니다.");
         return;
       }
+
       if (supabase) {
-        await supabase.from('events').update(form).eq('id', eventModal.data.id);
+        const updatePayload = {
+          date: form.date,
+          dept: form.dept || null,
+          grade: form.grade || null,
+          content: form.content,
+          password: form.password
+        };
+
+        const { error } = await supabase.from('events').update(updatePayload).eq('id', eventModal.data.id);
+
+        if (error) {
+          console.error("Supabase update error:", error);
+          setPwCheckError(`DB 수정 실패: ${error.message}`);
+          return;
+        }
+        await fetchAllData();
+      } else {
+        setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...form } : e)));
       }
-      setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...form } : e)));
       closeEventModal();
     }
   };
 
+  // 일정 삭제
   const deleteEvent = async () => {
-    if (pwCheckInput !== eventModal.data.password) {
+    if (pwCheckInput !== eventModal.data.password && pwCheckInput !== masterPassword) {
       setPwCheckError("비밀번호가 일치하지 않습니다.");
       return;
     }
     if (supabase) {
-      await supabase.from('events').delete().eq('id', eventModal.data.id);
+      const { error } = await supabase.from('events').delete().eq('id', eventModal.data.id);
+      if (error) {
+        console.error("Supabase delete error:", error);
+        setPwCheckError(`DB 삭제 실패: ${error.message}`);
+        return;
+      }
+      await fetchAllData();
+    } else {
+      setEvents((prev) => prev.filter((e) => e.id !== eventModal.data.id));
     }
-    setEvents((prev) => prev.filter((e) => e.id !== eventModal.data.id));
     closeEventModal();
   };
 
+  // 마스터 비밀번호 변경 모달 열기
   const openMasterPwModal = () => {
-    setCurrPwInput("");
+    setCurrentPwInput("");
     setNewPwInput("");
-    setConfirmPwInput("");
-    setPwChangeError("");
-    setPwChangeSuccess("");
+    setNewPwConfirmInput("");
+    setMasterPwError("");
+    setMasterPwSuccess("");
     setMasterPwModalOpen(true);
   };
 
-  const handleMasterPwChange = () => {
-    setPwChangeError("");
-    setPwChangeSuccess("");
+  const handleSaveMasterPassword = () => {
+    setMasterPwError("");
+    setMasterPwSuccess("");
 
-    if (!currPwInput) {
-      setPwChangeError("현재 마스터 비밀번호를 입력해주세요.");
+    if (currentPwInput !== masterPassword) {
+      setMasterPwError("현재 마스터 비밀번호가 일치하지 않습니다.");
       return;
     }
-    if (currPwInput !== masterPassword) {
-      setPwChangeError("현재 마스터 비밀번호가 일치하지 않습니다.");
+    if (!newPwInput.trim()) {
+      setMasterPwError("새 비밀번호를 입력해주세요.");
       return;
     }
-    if (!newPwInput) {
-      setPwChangeError("새 마스터 비밀번호를 입력해주세요.");
-      return;
-    }
-    if (newPwInput !== confirmPwInput) {
-      setPwChangeError("새 마스터 비밀번호가 일치하지 않습니다.");
+    if (newPwInput !== newPwConfirmInput) {
+      setMasterPwError("새 비밀번호가 일치하지 않습니다.");
       return;
     }
 
-    setMasterPassword(newPwInput);
-    localStorage.setItem("sp_master_pw", newPwInput);
-    setPwChangeSuccess("마스터 비밀번호가 성공적으로 변경되었습니다.");
+    const cleanPw = newPwInput.trim();
+    localStorage.setItem("sp_master_pw", cleanPw);
+    setMasterPassword(cleanPw);
+    setMasterPwSuccess("마스터 비밀번호가 성공적으로 변경되었습니다.");
     setTimeout(() => {
       setMasterPwModalOpen(false);
     }, 1200);
   };
 
-  const handleResetMasterPw = () => {
-    if (confirm("마스터 비밀번호를 초기 비밀번호(1234)로 reset 하시겠습니까?")) {
-      setMasterPassword(MASTER_PASSWORD_DEFAULT);
+  const handleResetMasterPassword = () => {
+    if (window.confirm("마스터 비밀번호를 초기값(1234)으로 리셋하시겠습니까?")) {
       localStorage.setItem("sp_master_pw", MASTER_PASSWORD_DEFAULT);
-      setCurrPwInput("");
-      setNewPwInput("");
-      setConfirmPwInput("");
-      setPwChangeError("");
-      setPwChangeSuccess("초기 비밀번호(1234)로 초기화되었습니다.");
+      setMasterPassword(MASTER_PASSWORD_DEFAULT);
+      setMasterPwSuccess("마스터 비밀번호가 초기값(1234)으로 리셋되었습니다.");
       setTimeout(() => {
         setMasterPwModalOpen(false);
       }, 1200);
     }
   };
 
+  // 관리자 근무 현황 모달
   const openAdminInput = () => {
     setAdminPwInput("");
     setAdminPwError("");
@@ -555,17 +595,23 @@ function App() {
   const saveAdminTexts = async () => {
     const updatedData = { ...adminFormTexts };
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: weekKey, data: updatedData }]);
+      const { error } = await supabase.from('admin_status').upsert([{ week_key: weekKey, data: updatedData }]);
+      if (error) {
+        console.error("Supabase admin_status error:", error);
+      }
+      await fetchAllData();
+    } else {
+      setAdminWorkStatus((prev) => ({
+        ...prev,
+        [weekKey]: updatedData
+      }));
     }
-    setAdminWorkStatus((prev) => ({
-      ...prev,
-      [weekKey]: updatedData
-    }));
     setAdminModalStage(null);
   };
 
   const closeAdminModal = () => setAdminModalStage(null);
 
+  // 부서명 수정 모달
   const openDeptEdit = () => {
     setDeptPwInput("");
     setDeptPwError("");
@@ -606,6 +652,7 @@ function App() {
     if (supabase) {
       await supabase.from('depts').delete().neq('id', -1);
       await supabase.from('depts').insert(dedupedNewDepts.map(name => ({ name })));
+      await fetchAllData();
     }
 
     setEvents((prev) =>
@@ -646,12 +693,12 @@ function App() {
     <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-24 sm:p-6">
       <div className="mx-auto max-w-3xl">
 
-        {/* DB 연결 경고 및 키 등록바 */}
+        {/* DB 연결 경고 바 */}
         {!supabase && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-amber-50 p-3.5 border border-amber-200 text-xs text-amber-800">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-amber-50 p-3.5 border border-amber-200 text-xs text-amber-800 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="font-bold text-amber-600">DB 미연동:</span>
-              <span>Supabase Key가 입력되지 않았습니다. 다른 사람과 공유하려면 anon key를 설정해 주세요.</span>
+              <span>Supabase Key가 입력되지 않았습니다. 데이터를 실시간 공유하려면 설정해주세요.</span>
             </div>
             <button
               onClick={() => { setKeyInput(anonKey === DEFAULT_SUPABASE_ANON_KEY ? "" : anonKey); setKeyModalOpen(true); }}
@@ -662,21 +709,20 @@ function App() {
           </div>
         )}
 
-        {/* 헤더 및 우측 액션 영역 */}
-        <div className="mb-3 flex items-start justify-between gap-2">
+        {/* 헤더 영역 (교표 포함) */}
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {/* 교표 이미지 (로딩 실패시 깔끔한 경연 엠블럼으로 자동 대체) */}
-            {logoErr ? (
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 text-white font-extrabold text-xs shadow-md ring-2 ring-violet-200">
-                경연
-              </div>
-            ) : (
+            {!logoError ? (
               <img
                 src="./logo.png"
                 alt="경연초 교표"
-                className="h-11 w-11 shrink-0 object-contain"
-                onError={() => setLogoErr(true)}
+                onError={() => setLogoError(true)}
+                className="h-10 w-10 shrink-0 object-contain rounded-full shadow-sm bg-white"
               />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white font-black text-xs shadow-md shadow-violet-200 border-2 border-white">
+                경연
+              </div>
             )}
             <div>
               <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">경연초 월별·주간 행사 계획</h1>
@@ -684,68 +730,68 @@ function App() {
             </div>
           </div>
 
-          {/* 우측 상단: [실시간 연동 중] 아래 / 날짜 조작부 위에 위치하는 [마스터 PW 변경] */}
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            {supabase && (
-              <button
-                onClick={() => { setKeyInput(anonKey); setKeyModalOpen(true); }}
-                className="flex items-center gap-1 rounded-xl bg-emerald-100 px-2.5 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-200 transition"
-                title="Supabase 실시간 연동 상태입니다"
-              >
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                실시간 연동 중
-              </button>
-            )}
-            {/* 마스터 PW 변경 버튼 위치 지정: [실시간 연동 중] 아래, 날짜 조작부 위 */}
+          {/* 실시간 연동 표시 버튼 */}
+          {supabase && (
             <button
-              onClick={openMasterPwModal}
-              className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-white/90 px-3 py-1 text-xs font-bold text-violet-600 shadow-sm hover:bg-violet-100 transition"
+              onClick={() => { setKeyInput(anonKey); setKeyModalOpen(true); }}
+              className="flex items-center gap-1.5 rounded-full bg-emerald-100/80 px-3 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-200 transition shadow-sm"
+              title="Supabase 실시간 연동 상태입니다"
             >
-              <ShieldCheckIcon size={14} className="text-violet-600" />
-              마스터 PW 변경
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              실시간 연동 중
+            </button>
+          )}
+        </div>
+
+        {/* [실시간 연동 중] 아래 / [오늘] 위 우측 정렬 마스터 PW 변경 버튼 */}
+        <div className="mb-2 flex justify-end">
+          <button
+            onClick={openMasterPwModal}
+            className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-white px-3.5 py-1 text-xs font-bold text-violet-600 hover:bg-violet-50 transition shadow-sm"
+          >
+            <ShieldCheckIcon size={14} className="text-violet-500" />
+            마스터 PW 변경
+          </button>
+        </div>
+
+        {/* 탭 & 날짜 이동 바 */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
+          <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+            <button
+              onClick={() => setTab("month")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                tab === "month" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <CalendarDaysIcon size={15} /> 월별 일정
+            </button>
+            <button
+              onClick={() => setTab("week")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                tab === "week" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <ClipboardListIcon size={15} /> 주간 업무 현황
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button onClick={goPrev} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <ChevronLeft size={18} />
+            </button>
+            <span className="min-w-[90px] text-center text-sm font-bold text-slate-700">
+              {tab === "month" ? monthLabel : weekLabel}
+            </span>
+            <button onClick={goNext} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <ChevronRight size={18} />
+            </button>
+            <button onClick={goToday} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+              오늘
             </button>
           </div>
         </div>
 
-        {/* 탭 & 날짜 이동 */}
-        <div className="mb-4 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
-            <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-              <button
-                onClick={() => setTab("month")}
-                className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-                  tab === "month" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <CalendarDaysIcon size={15} /> 월별 일정
-              </button>
-              <button
-                onClick={() => setTab("week")}
-                className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-                  tab === "week" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <ClipboardListIcon size={15} /> 주간 업무 현황
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={goPrev} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-                <ChevronLeft size={18} />
-              </button>
-              <span className="min-w-[90px] text-center text-sm font-bold text-slate-700">
-                {tab === "month" ? monthLabel : weekLabel}
-              </span>
-              <button onClick={goNext} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-                <ChevronRight size={18} />
-              </button>
-              <button onClick={goToday} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
-                오늘
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 필터 */}
+        {/* 필터 영역 */}
         <div className="mb-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <FilterRow
             label="학년"
@@ -830,6 +876,7 @@ function App() {
                   <LockIcon size={12} /> 입력
                 </button>
               </div>
+
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {ADMIN_ROLES.map((role) => {
                   const text = currentWeekTexts[role];
@@ -847,26 +894,23 @@ function App() {
           </>
         )}
 
-        {}
-        {/* 마스터 비밀번호 변경 모달 */}
+        {/* 1. 마스터 비밀번호 변경 모달 */}
         {masterPwModalOpen && (
           <Modal title="관리자 마스터 비밀번호 변경" onClose={() => setMasterPwModalOpen(false)}>
-            <div className="space-y-4">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                부서명 수정 및 관리자 근무 현황 입력 시 사용하는 <span className="font-bold text-slate-700">마스터 인증 비밀번호</span>를 변경합니다. <span className="font-bold text-violet-600">(초기비밀번호:1234)</span>
-              </p>
-
+            <p className="mb-3 text-xs text-slate-500 leading-relaxed">
+              부서명 수정 및 관리자 근무 현황 입력 시 사용하는 <b>마스터 인증 비밀번호</b>를 변경합니다. <span className="text-violet-600 font-bold">(초기비밀번호:1234)</span>
+            </p>
+            <div className="space-y-3">
               <div>
                 <FieldLabel>현재 마스터 비밀번호</FieldLabel>
                 <input
                   type="password"
-                  value={currPwInput}
-                  onChange={(e) => setCurrPwInput(e.target.value)}
+                  value={currentPwInput}
+                  onChange={(e) => setCurrentPwInput(e.target.value)}
                   className={inputCls}
                   placeholder="현재 비밀번호 입력"
                 />
               </div>
-
               <div>
                 <FieldLabel>새 마스터 비밀번호</FieldLabel>
                 <input
@@ -877,44 +921,40 @@ function App() {
                   placeholder="새 비밀번호 입력"
                 />
               </div>
-
               <div>
                 <FieldLabel>새 마스터 비밀번호 확인</FieldLabel>
                 <input
                   type="password"
-                  value={confirmPwInput}
-                  onChange={(e) => setConfirmPwInput(e.target.value)}
+                  value={newPwConfirmInput}
+                  onChange={(e) => setNewPwConfirmInput(e.target.value)}
                   className={inputCls}
                   placeholder="새 비밀번호 다시 입력"
                 />
               </div>
 
-              {pwChangeError && (
-                <p className="text-xs font-semibold text-rose-500">{pwChangeError}</p>
-              )}
-              {pwChangeSuccess && (
-                <p className="text-xs font-semibold text-emerald-600">{pwChangeSuccess}</p>
-              )}
+              {masterPwError && <p className="text-xs font-semibold text-rose-500">{masterPwError}</p>}
+              {masterPwSuccess && <p className="text-xs font-semibold text-emerald-600">{masterPwSuccess}</p>}
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-2">
                 <button
                   onClick={() => setMasterPwModalOpen(false)}
                   className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition"
                 >
                   취소
                 </button>
+
                 <button
-                  onClick={handleMasterPwChange}
-                  className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition"
+                  onClick={handleSaveMasterPassword}
+                  className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-md shadow-violet-200"
                 >
                   비밀번호 변경
                 </button>
               </div>
 
-              <div className="pt-1">
+              <div className="pt-2">
                 <button
-                  onClick={handleResetMasterPw}
-                  className="w-full rounded-xl border border-rose-100 bg-rose-50/70 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-100 transition"
+                  onClick={handleResetMasterPassword}
+                  className="w-full rounded-xl border border-rose-100 bg-rose-50/70 py-2 text-xs font-bold text-rose-500 hover:bg-rose-100 transition"
                 >
                   비밀번호 초기화
                 </button>
@@ -923,7 +963,7 @@ function App() {
           </Modal>
         )}
 
-        {/* Key 설정 모달 */}
+        {/* 2. Supabase 키 설정 모달 */}
         {keyModalOpen && (
           <Modal title="Supabase API Anon Key 설정" onClose={() => setKeyModalOpen(false)} wide>
             <div className="space-y-3">
@@ -952,7 +992,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 일정 추가/수정 모달 */}
+        {/* 3. 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={closeEventModal} wide>
             <div className="space-y-3">
@@ -960,6 +1000,7 @@ function App() {
                 <FieldLabel>날짜</FieldLabel>
                 <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputCls} />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <FieldLabel>담당 부서</FieldLabel>
@@ -980,6 +1021,7 @@ function App() {
                   </select>
                 </div>
               </div>
+
               <div>
                 <FieldLabel>행사 내용</FieldLabel>
                 <textarea
@@ -987,7 +1029,7 @@ function App() {
                   onChange={(e) => setForm({ ...form, content: e.target.value })}
                   rows={3}
                   className={inputCls}
-                  placeholder="예) 디지털새싹캠프(9:00~12:00, A1실, 5~6학년 10명)"
+                  placeholder="예) 놀이교육(9:00~12:00, 꿈키움터, 1학년 00학급)"
                 />
               </div>
 
@@ -1041,33 +1083,27 @@ function App() {
           </Modal>
         )}
 
-        {/* 관리자 근무 현황: 비밀번호 인증 모달 */}
+        {/* 4. 관리자 근무 현황: 비밀번호 모달 */}
         {adminModalStage === "password" && (
           <Modal title="관리자 인증" onClose={closeAdminModal}>
-            <div>
-              <FieldLabel>마스터 비밀번호</FieldLabel>
-              <input
-                type="password"
-                autoFocus
-                value={adminPwInput}
-                onChange={(e) => setAdminPwInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submitAdminPassword()}
-                className={inputCls}
-                placeholder="비밀번호를 입력하세요"
-              />
-              {adminPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{adminPwError}</p>}
-              <button
-                onClick={submitAdminPassword}
-                className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"
-              >
-                확인
-              </button>
-              <p className="mt-2 text-center text-[11px] text-slate-400">초기 마스터 비밀번호: {MASTER_PASSWORD_DEFAULT}</p>
-            </div>
+            <FieldLabel>마스터 비밀번호</FieldLabel>
+            <input
+              type="password"
+              autoFocus
+              value={adminPwInput}
+              onChange={(e) => setAdminPwInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitAdminPassword()}
+              className={inputCls}
+              placeholder="비밀번호를 입력하세요"
+            />
+            {adminPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{adminPwError}</p>}
+            <button onClick={submitAdminPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">
+              확인
+            </button>
           </Modal>
         )}
 
-        {/* 관리자 근무 현황: 편집 모달 */}
+        {/* 5. 관리자 근무 현황: 편집 모달 */}
         {adminModalStage === "edit" && (
           <Modal title={`관리자 근무 현황 작성 (${weekLabel})`} onClose={closeAdminModal} wide>
             <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
@@ -1079,7 +1115,7 @@ function App() {
                     onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
                     rows={2}
                     className={inputCls}
-                    placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회 (11:00~16:30, 청라커낼웨이 일대)"
+                    placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회"
                   />
                 </div>
               ))}
@@ -1095,33 +1131,27 @@ function App() {
           </Modal>
         )}
 
-        {/* 부서명 수정: 비밀번호 인증 모달 */}
+        {/* 6. 부서명 수정: 비밀번호 모달 */}
         {deptModalStage === "password" && (
           <Modal title="마스터 인증" onClose={closeDeptModal}>
-            <div>
-              <FieldLabel>마스터 비밀번호</FieldLabel>
-              <input
-                type="password"
-                autoFocus
-                value={deptPwInput}
-                onChange={(e) => setDeptPwInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submitDeptPassword()}
-                className={inputCls}
-                placeholder="비밀번호를 입력하세요"
-              />
-              {deptPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{deptPwError}</p>}
-              <button
-                onClick={submitDeptPassword}
-                className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition"
-              >
-                확인
-              </button>
-              <p className="mt-2 text-center text-[11px] text-slate-400">초기 마스터 비밀번호: {MASTER_PASSWORD_DEFAULT}</p>
-            </div>
+            <FieldLabel>마스터 비밀번호</FieldLabel>
+            <input
+              type="password"
+              autoFocus
+              value={deptPwInput}
+              onChange={(e) => setDeptPwInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitDeptPassword()}
+              className={inputCls}
+              placeholder="비밀번호를 입력하세요"
+            />
+            {deptPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{deptPwError}</p>}
+            <button onClick={submitDeptPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">
+              확인
+            </button>
           </Modal>
         )}
 
-        {/* 부서명 수정: 편집 모달 */}
+        {/* 7. 부서명 수정: 편집 모달 */}
         {deptModalStage === "edit" && (
           <Modal title="담당 부서명 수정" onClose={closeDeptModal} wide>
             <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
