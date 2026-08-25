@@ -23,16 +23,13 @@ body { font-family: 'Inter', sans-serif; }
 <div id="root"></div>
 
 <script type="text/babel">
-// Supabase 설정
 const RAW_SUPABASE_URL = "https://ozflxmatleyttxwfrckb.supabase.co/rest/v1/";
 const SUPABASE_URL = RAW_SUPABASE_URL.replace(/\/rest\/v1\/?$/, "");
 const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96Zmx4bWF0bGV5dHR4d2ZyY2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NDY5ODgsImV4cCI6MjEwMzIyMjk4OH0.S4hWR5krOBKlQNhGqe5phNxvyoy8E1H32WoODrC_5l0";
 
 const { useState, useMemo, useEffect, useCallback } = React;
 
-// 대한민국 주요 법정 공휴일 (양력 및 2024~2027 주요 음력 명절/대체휴일)
 const FIXED_HOLIDAYS = {
-  // 양력 반복 공휴일 (월-일)
   "01-01": "신정",
   "03-01": "삼일절",
   "05-05": "어린이날",
@@ -42,19 +39,16 @@ const FIXED_HOLIDAYS = {
   "10-09": "한글날",
   "12-25": "성탄절",
 
-  // 2025년 명절 및 대체공휴일
   "2025-01-28": "설날 연휴", "2025-01-29": "설날", "2025-01-30": "설날 연휴",
   "2025-03-03": "대체공휴일(삼일절)", "2025-05-06": "대체공휴일(어린이날/부처님오신날)",
   "2025-10-05": "추석 연휴", "2025-10-06": "추석", "2025-10-07": "추석 연휴", "2025-10-08": "대체공휴일",
 
-  // 2026년 명절 및 대체공휴일
   "2026-02-16": "설날 연휴", "2026-02-17": "설날", "2026-02-18": "설날 연휴",
   "2026-03-02": "대체공휴일(삼일절)", "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일",
   "2026-08-17": "대체공휴일(광복절)",
   "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴",
   "2026-10-05": "대체공휴일(개천절)",
 
-  // 2027년 명절 및 대체공휴일
   "2027-02-06": "설날 연휴", "2027-02-07": "설날", "2027-02-08": "설날 연휴", "2027-02-09": "대체공휴일",
   "2027-05-13": "부처님오신날",
   "2027-08-16": "대체공휴일(광복절)",
@@ -206,7 +200,6 @@ function FieldLabel({ children }) {
 
 const inputCls = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100 transition";
 
-// 휴일명 조회 헬퍼 함수 (법정공휴일 + 학교재량휴업일)
 function getHolidayName(dateStr, customHolidays) {
   if (customHolidays && customHolidays[dateStr]) {
     return customHolidays[dateStr];
@@ -232,7 +225,7 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
   const dateColor = isToday ? "text-emerald-600" : isHoliday ? "text-rose-500 font-black" : dow === 6 ? "text-blue-400" : "text-slate-500";
 
   return (
-    <div className={`flex gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-4 ${rowBg} ${isLast ? "border-b-0" : ""}`}>
+    <div className={`flex gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-4 min-h-[52px] ${rowBg} ${isLast ? "border-b-0" : ""}`}>
       <div className={`flex w-16 shrink-0 flex-col items-start pt-0.5 sm:w-20 ${dateColor}`}>
         <div className="flex items-center gap-1 text-sm font-extrabold">
           {date.getDate()}
@@ -312,7 +305,6 @@ function App() {
 
   const [copiedEvent, setCopiedEvent] = useState(null);
 
-  // 학교 재량휴업일(맞춤 휴일) 상태
   const [customHolidays, setCustomHolidays] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("sp_custom_holidays")) || {};
@@ -359,7 +351,6 @@ function App() {
   const [deptPwError, setDeptPwError] = useState("");
   const [deptEditRows, setDeptEditRows] = useState([]);
 
-  // DB에서 데이터 불러오기
   const fetchAllData = useCallback(async () => {
     if (!supabase) return;
     try {
@@ -591,7 +582,6 @@ function App() {
     }
   };
 
-  // 재량휴업일(맞춤 휴일) 모달 함수
   const openHolidayModal = () => {
     setHolidayPwInput("");
     setHolidayPwError("");
@@ -726,7 +716,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-24 sm:p-6">
+    <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-32 sm:p-6 sm:pb-36">
       <div className="mx-auto max-w-3xl">
         {(!supabase) && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-amber-50 p-3.5 border border-amber-200 text-xs text-amber-800">
@@ -740,7 +730,6 @@ function App() {
           </div>
         )}
 
-        {/* 복사 알림 배너 */}
         {copiedEvent && (
           <div className="mb-4 flex items-center justify-between rounded-xl bg-violet-600 px-4 py-2.5 text-white shadow-lg shadow-violet-200">
             <div className="flex items-center gap-2 text-xs truncate">
@@ -773,7 +762,6 @@ function App() {
           )}
         </div>
 
-        {/* 상단 우측 버튼군: 재량휴업일 관리 & 마스터 PW 변경 */}
         <div className="mb-2 flex justify-end gap-2">
           <button
             onClick={openHolidayModal}
@@ -831,7 +819,7 @@ function App() {
         </div>
 
         {tab === "month" ? (
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 mb-8">
             {monthDays.map((d, idx) => (
               <DateRow
                 key={ymd(d)}
@@ -862,8 +850,7 @@ function App() {
               ))}
             </div>
 
-            {/* 관리자 근무 현황 카드 */}
-            <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="mt-4 mb-8 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-extrabold text-slate-700">관리자 근무 현황</h2>
@@ -898,7 +885,6 @@ function App() {
           </>
         )}
 
-        {/* 1. 관리자 마스터 비밀번호 변경 모달 */}
         {masterPwModalOpen && (
           <Modal title="관리자 마스터 비밀번호 변경" onClose={() => setMasterPwModalOpen(false)}>
             <p className="mb-3 text-xs text-slate-500 leading-relaxed">
@@ -966,7 +952,6 @@ function App() {
           </Modal>
         )}
 
-        {/* 2. 학교 재량휴업일(맞춤 휴일) 모달 */}
         {holidayModalStage === "password" && (
           <Modal title="재량휴업일 관리 인증" onClose={() => setHolidayModalStage(null)}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -1051,7 +1036,6 @@ function App() {
           </Modal>
         )}
 
-        {/* 3. Supabase API Anon Key 모달 */}
         {keyModalOpen && (
           <Modal title="Supabase API Anon Key 설정" onClose={() => setKeyModalOpen(false)} wide>
             <div className="space-y-3">
@@ -1070,7 +1054,6 @@ function App() {
           </Modal>
         )}
 
-        {/* 4. 일정 추가/수정 모달 */}
         {eventModal && (
           <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={closeEventModal} wide>
             <div className="space-y-3">
@@ -1128,7 +1111,6 @@ function App() {
           </Modal>
         )}
 
-        {/* 5. 관리자 근무 현황 인증 모달 */}
         {adminModalStage === "password" && (
           <Modal title="관리자 인증" onClose={closeAdminModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -1139,7 +1121,6 @@ function App() {
           </Modal>
         )}
 
-        {/* 6. 관리자 근무 현황 작성 모달 */}
         {adminModalStage === "edit" && (
           <Modal
             title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성 (${weekLabel})` : `관리자 근무 현황 작성 (${weekLabel})`}
@@ -1167,7 +1148,6 @@ function App() {
           </Modal>
         )}
 
-        {/* 7. 부서명 수정 인증 모달 */}
         {deptModalStage === "password" && (
           <Modal title="마스터 인증" onClose={closeDeptModal}>
             <FieldLabel>마스터 비밀번호</FieldLabel>
@@ -1178,7 +1158,6 @@ function App() {
           </Modal>
         )}
 
-        {/* 8. 부서명 수정 편집 모달 */}
         {deptModalStage === "edit" && (
           <Modal title="담당 부서명 수정" onClose={closeDeptModal} wide>
             <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
