@@ -4,23 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>인천경연초등학교 월별ㆍ주별 행사 계획</title>
-  <!-- Tailwind CSS & React 라이브러리 -->
+  <!-- Tailwind CSS & React CDN (클로드 코드가 브라우저에서 바로 동작하게 해주는 필수 라이브러리) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-slate-50">
+<body class="bg-slate-50 text-slate-800">
   <div id="root"></div>
 
   <script type="text/babel">
-    // 👇 이 자리에 클로드에서 복사한 전체 코드를 그대로 붙여넣으세요!
-    
-  </script>
-</body>
-</html>
-import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, X, Plus, Trash2, Lock, Sparkles, CalendarDays, ClipboardList, Pencil } from "lucide-react";
+    // -------------------------------------------------------------
+    // 👇 아래 영역에 클로드(Claude)에서 복사한 전체 코드를 붙여넣으세요.
+    // (단, 맨 위 1~2번째 줄의 'import React...' 구문은 제외하고 붙여넣으셔야 에러가 안 납니다!)
+    // -------------------------------------------------------------
+const { useState, useMemo, useEffect } = React;
 
 /* ----------------------------- 상수 정의 ----------------------------- */
 
@@ -852,3 +850,14 @@ function FilterRow({ label, items, selected, onToggle, onAll, onNone, editAction
     </div>
   );
 }
+    
+
+
+
+
+    // -------------------------------------------------------------
+    // 👆 클로드 코드 붙여넣기 끝
+    // -------------------------------------------------------------
+  </script>
+</body>
+</html>
