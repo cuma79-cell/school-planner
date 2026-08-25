@@ -1,0 +1,833 @@
+import React, { useState, useMemo } from "react";
+import { ChevronLeft, ChevronRight, X, Plus, Trash2, Lock, Sparkles, CalendarDays, ClipboardList, Pencil } from "lucide-react";
+
+/* ----------------------------- 상수 정의 ----------------------------- */
+
+const GRADES = ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
+const INITIAL_DEPTS = ["교무기획", "정보", "혁신연구", "진로인성안전", "특수교육운영", "문화과학", "학생생활", "과학환경", "행정실", "늘봄지원"];
+const ADMIN_ROLES = ["교장", "교감(교무)", "교감(생활)", "행정실장"];
+const WEEKDAY_KOR = ["일", "월", "화", "수", "목", "금", "토"];
+const MASTER_PASSWORD_DEFAULT = "1234";
+
+// 태그 색상 팔레트 - 태그 문자열을 해시하여 일관된 파스텔 색상을 배정
+const PALETTE = [
+  "bg-indigo-100 text-indigo-700 border-indigo-200",
+  "bg-sky-100 text-sky-700 border-sky-200",
+  "bg-emerald-100 text-emerald-700 border-emerald-200",
+  "bg-amber-100 text-amber-700 border-amber-200",
+  "bg-rose-100 text-rose-700 border-rose-200",
+  "bg-violet-100 text-violet-700 border-violet-200",
+  "bg-teal-100 text-teal-700 border-teal-200",
+  "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+  "bg-lime-100 text-lime-700 border-lime-200",
+  "bg-cyan-100 text-cyan-700 border-cyan-200",
+  "bg-orange-100 text-orange-700 border-orange-200",
+  "bg-slate-200 text-slate-700 border-slate-300",
+];
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function getTagStyle(label) {
+  if (!label) return "bg-slate-100 text-slate-400 border-slate-200";
+  return PALETTE[hashStr(label) % PALETTE.length];
+}
+
+function tagLabel(ev) {
+  if (ev.dept && ev.grade) return `${ev.dept}·${ev.grade}`;
+  return ev.dept || ev.grade || "전체";
+}
+
+/* ----------------------------- 날짜 유틸 ----------------------------- */
+
+const pad2 = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const sameDay = (a, b) => ymd(a) === ymd(b);
+const addDays = (d, n) => {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+};
+const addMonths = (d, n) => {
+  const r = new Date(d);
+  r.setMonth(r.getMonth() + n);
+  return r;
+};
+const startOfWeekMon = (d) => {
+  const r = new Date(d);
+  const day = r.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  return addDays(r, diff);
+};
+
+function getMonthDays(viewDate) {
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const days = [];
+  for (let d = 1; d <= lastDate; d++) days.push(new Date(year, month, d));
+  return days;
+}
+
+function getWeekdays(anchor) {
+  const mon = startOfWeekMon(anchor);
+  return [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
+}
+
+function weekKeyOf(date) {
+  return ymd(startOfWeekMon(date));
+}
+
+/* ----------------------------- 초기 샘플 데이터 ----------------------------- */
+
+const todaySeed = new Date();
+const seedYMD = (offset) => ymd(addDays(todaySeed, offset));
+
+const INITIAL_EVENTS = [
+  { id: "e1", date: seedYMD(0), dept: "교무기획", grade: "", content: "2학기 개학식 (전교생 등교, 8:40 운동장 집합)", password: "1234" },
+  { id: "e2", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털새싹캠프(9:00~12:00, AI실, 5~6학년 10명)", password: "1234" },
+  { id: "e3", date: seedYMD(-2), dept: "정보", grade: "", content: "디지털새싹캠프(9:30~11:30, 4-2 교실, 3~4학년 20명)", password: "1234" },
+  { id: "e4", date: seedYMD(-1), dept: "교무기획", grade: "", content: "기획위원회(15:30, 2층 회의실)", password: "1234" },
+  { id: "e5", date: seedYMD(-1), dept: "", grade: "5학년", content: "민속무용교육(외부강사, 1~5교시, 교실)", password: "1234" },
+  { id: "e6", date: seedYMD(0), dept: "진로인성안전", grade: "", content: "2학기 학급임원선거(3~6학년)", password: "1234" },
+  { id: "e7", date: seedYMD(0), dept: "특수교육운영", grade: "", content: "2학기 개별화교육지원팀 협의(~8/31)", password: "1234" },
+  { id: "e8", date: seedYMD(0), dept: "", grade: "4학년", content: "학교폭력예방교육(외부강사, 1~2교시, 4개반씩, 교실)", password: "1234" },
+  { id: "e9", date: seedYMD(0), dept: "", grade: "6학년", content: "국악교육(1~5교시, 음악실)", password: "1234" },
+  { id: "e10", date: seedYMD(1), dept: "혁신연구", grade: "", content: "글빛마루 오프닝 행사(커팅식), 13:50~14:00", password: "1234" },
+  { id: "e11", date: seedYMD(1), dept: "문화과학", grade: "4학년", content: "4,5학년 영재 수업 시작", password: "1234" },
+  { id: "e12", date: seedYMD(1), dept: "행정실", grade: "", content: "소방종합점검 14:30~", password: "1234" },
+];
+
+function buildInitialAdminWorkStatus() {
+  const key = weekKeyOf(todaySeed);
+  return {
+    [key]: {
+      "교장": "특이사항 없음",
+      "교감(교무)": "28(금) [출장] 서구3지구 교감단 자율장학협의회\n(11:00~16:30, 청라커넬웨이 일대)",
+      "교감(생활)": "24(월) [출장] 유치원장 자격연수\n(~28, 한국교원대학교)",
+      "행정실장": "특이사항 없음",
+    },
+  };
+}
+
+/* ----------------------------- 공용 UI 조각 ----------------------------- */
+
+function Badge({ className = "", children }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-bold leading-none ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function Modal({ title, onClose, children, wide = false }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/5`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FieldLabel({ children }) {
+  return <label className="mb-1 block text-xs font-semibold text-slate-500">{children}</label>;
+}
+
+const inputCls =
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100";
+
+/* ----------------------------- 날짜 행 (월별/주간 공용) ----------------------------- */
+
+function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent }) {
+  const dateStr = ymd(date);
+  const dow = date.getDay();
+  const isToday = sameDay(date, today);
+  const rowBg = isToday ? "bg-emerald-50/70" : dow === 0 ? "bg-rose-50/40" : dow === 6 ? "bg-blue-50/30" : "bg-white";
+  const dateColor = isToday ? "text-emerald-600" : dow === 0 ? "text-rose-400" : dow === 6 ? "text-blue-400" : "text-slate-500";
+
+  return (
+    <div className={`flex gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-4 ${rowBg} ${isLast ? "border-b-0" : ""}`}>
+      <div className={`flex w-14 shrink-0 items-start gap-1 pt-0.5 text-sm font-extrabold sm:w-16 ${dateColor}`}>
+        {date.getDate()}
+        <span className="text-xs font-bold">({WEEKDAY_KOR[dow]})</span>
+      </div>
+
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {events.length === 0 ? (
+          <p className="pt-0.5 text-xs text-slate-200">-</p>
+        ) : (
+          events.map((ev) => (
+            <button
+              key={ev.id}
+              onClick={() => onOpenEvent(ev)}
+              className="flex w-full items-start gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-50"
+            >
+              <Badge className={getTagStyle(tagLabel(ev))}>{tagLabel(ev)}</Badge>
+              <span className="pt-0.5 text-[13px] leading-snug text-slate-600">{ev.content}</span>
+            </button>
+          ))
+        )}
+      </div>
+
+      <button
+        onClick={() => onAddEvent(dateStr)}
+        className="h-6 w-6 shrink-0 self-start rounded-full text-slate-300 hover:bg-violet-100 hover:text-violet-500"
+        title="이 날짜에 일정 추가"
+      >
+        <Plus size={16} className="mx-auto" />
+      </button>
+    </div>
+  );
+}
+
+/* ----------------------------- 메인 앱 ----------------------------- */
+
+export default function App() {
+  const today = new Date();
+
+  const [tab, setTab] = useState("month"); // 'month' | 'week'
+  const [viewDate, setViewDate] = useState(new Date()); // 월별 탭 기준일
+  const [weekAnchor, setWeekAnchor] = useState(new Date()); // 주간 탭 기준일
+
+  // 부서 목록 (마스터 권한으로 수정 가능)
+  const [depts, setDepts] = useState(INITIAL_DEPTS);
+
+  // 필터
+  const [selectedDepts, setSelectedDepts] = useState(new Set(INITIAL_DEPTS));
+  const [selectedGrades, setSelectedGrades] = useState(new Set(GRADES));
+
+  // 일정 데이터
+  const [events, setEvents] = useState(INITIAL_EVENTS);
+  const emptyForm = { date: ymd(today), dept: "", grade: "", content: "", password: "" };
+  const [eventModal, setEventModal] = useState(null); // { mode: 'add' | 'edit', data? }
+  const [form, setForm] = useState(emptyForm);
+  const [pwCheckInput, setPwCheckInput] = useState("");
+  const [pwCheckError, setPwCheckError] = useState("");
+
+  // 마스터 비밀번호 (관리자 근무현황 입력 / 부서명 수정 공용)
+  const [masterPassword] = useState(MASTER_PASSWORD_DEFAULT);
+
+  // 관리자 근무 현황
+  const [adminWorkStatus, setAdminWorkStatus] = useState(buildInitialAdminWorkStatus());
+  const [adminModalStage, setAdminModalStage] = useState(null); // null | 'password' | 'edit'
+  const [adminPwInput, setAdminPwInput] = useState("");
+  const [adminPwError, setAdminPwError] = useState("");
+  const [adminFormTexts, setAdminFormTexts] = useState({});
+
+  // 부서명 수정
+  const [deptModalStage, setDeptModalStage] = useState(null); // null | 'password' | 'edit'
+  const [deptPwInput, setDeptPwInput] = useState("");
+  const [deptPwError, setDeptPwError] = useState("");
+  const [deptEditRows, setDeptEditRows] = useState([]); // [{key, value}]
+
+  /* ---------- 파생 데이터 ---------- */
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((e) => {
+      const deptOk = e.dept === "" || selectedDepts.has(e.dept);
+      const gradeOk = e.grade === "" || selectedGrades.has(e.grade);
+      return deptOk && gradeOk;
+    });
+  }, [events, selectedDepts, selectedGrades]);
+
+  const eventsByDate = useMemo(() => {
+    const map = {};
+    filteredEvents.forEach((e) => {
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push(e);
+    });
+    return map;
+  }, [filteredEvents]);
+
+  const monthDays = getMonthDays(viewDate);
+  const monthLabel = `${viewDate.getFullYear()}년 ${viewDate.getMonth() + 1}월`;
+
+  const weekDates = getWeekdays(weekAnchor);
+  const weekStart = weekDates[0];
+  const weekEnd = weekDates[4];
+  const weekKey = ymd(weekStart);
+  const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} ~ ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+  const currentWeekTexts = adminWorkStatus[weekKey] || {};
+
+  /* ---------- 핸들러: 필터 ---------- */
+
+  const toggleInSet = (set, setter, value) => {
+    const next = new Set(set);
+    next.has(value) ? next.delete(value) : next.add(value);
+    setter(next);
+  };
+
+  /* ---------- 핸들러: 날짜 이동 (탭에 따라 월/주 전환) ---------- */
+
+  const goPrev = () => (tab === "month" ? setViewDate((d) => addMonths(d, -1)) : setWeekAnchor((d) => addDays(d, -7)));
+  const goNext = () => (tab === "month" ? setViewDate((d) => addMonths(d, 1)) : setWeekAnchor((d) => addDays(d, 7)));
+  const goToday = () => (tab === "month" ? setViewDate(new Date()) : setWeekAnchor(new Date()));
+
+  /* ---------- 핸들러: 일정 ---------- */
+
+  const openAddEvent = (dateStr) => {
+    setForm({ ...emptyForm, date: dateStr || ymd(today) });
+    setPwCheckInput("");
+    setPwCheckError("");
+    setEventModal({ mode: "add" });
+  };
+
+  const openEditEvent = (ev) => {
+    setForm({ date: ev.date, dept: ev.dept, grade: ev.grade, content: ev.content, password: ev.password });
+    setPwCheckInput("");
+    setPwCheckError("");
+    setEventModal({ mode: "edit", data: ev });
+  };
+
+  const closeEventModal = () => setEventModal(null);
+
+  const isValidPw = (v) => /^\d{4}$/.test(v);
+
+  const saveEvent = () => {
+    if (!form.content.trim()) return;
+    if (eventModal.mode === "add") {
+      if (!isValidPw(form.password)) {
+        setPwCheckError("비밀번호는 숫자 4자리로 설정해 주세요.");
+        return;
+      }
+      const newEv = { id: `e${Date.now()}`, ...form };
+      setEvents((prev) => [...prev, newEv]);
+      closeEventModal();
+    } else {
+      if (pwCheckInput !== eventModal.data.password) {
+        setPwCheckError("비밀번호가 일치하지 않습니다.");
+        return;
+      }
+      setEvents((prev) => prev.map((e) => (e.id === eventModal.data.id ? { ...e, ...form } : e)));
+      closeEventModal();
+    }
+  };
+
+  const deleteEvent = () => {
+    if (pwCheckInput !== eventModal.data.password) {
+      setPwCheckError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setEvents((prev) => prev.filter((e) => e.id !== eventModal.data.id));
+    closeEventModal();
+  };
+
+  /* ---------- 핸들러: 관리자 근무 현황 ---------- */
+
+  const openAdminInput = () => {
+    setAdminPwInput("");
+    setAdminPwError("");
+    setAdminModalStage("password");
+  };
+
+  const submitAdminPassword = () => {
+    if (adminPwInput !== masterPassword) {
+      setAdminPwError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    const base = {};
+    ADMIN_ROLES.forEach((r) => (base[r] = currentWeekTexts[r] || ""));
+    setAdminFormTexts(base);
+    setAdminModalStage("edit");
+  };
+
+  const saveAdminTexts = () => {
+    setAdminWorkStatus((prev) => ({ ...prev, [weekKey]: { ...adminFormTexts } }));
+    setAdminModalStage(null);
+  };
+
+  const closeAdminModal = () => setAdminModalStage(null);
+
+  /* ---------- 핸들러: 부서명 수정 (마스터 권한) ---------- */
+
+  const openDeptEdit = () => {
+    setDeptPwInput("");
+    setDeptPwError("");
+    setDeptModalStage("password");
+  };
+
+  const submitDeptPassword = () => {
+    if (deptPwInput !== masterPassword) {
+      setDeptPwError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setDeptEditRows(depts.map((d, i) => ({ key: `i${i}`, value: d })));
+    setDeptModalStage("edit");
+  };
+
+  const updateDeptRow = (key, value) => {
+    setDeptEditRows((prev) => prev.map((r) => (r.key === key ? { ...r, value } : r)));
+  };
+
+  const addDeptRow = () => {
+    setDeptEditRows((prev) => [...prev, { key: `n${Date.now()}`, value: "" }]);
+  };
+
+  const removeDeptRow = (key) => {
+    setDeptEditRows((prev) => prev.filter((r) => r.key !== key));
+  };
+
+  const saveDeptEdits = () => {
+    // 기존 인덱스(iN) -> 새 이름 매핑, 삭제된 경우 null
+    const renameMap = {};
+    depts.forEach((oldName, i) => {
+      const row = deptEditRows.find((r) => r.key === `i${i}`);
+      renameMap[oldName] = row && row.value.trim() ? row.value.trim() : null;
+    });
+
+    const newDepts = deptEditRows.map((r) => r.value.trim()).filter((v) => v.length > 0);
+    const dedupedNewDepts = Array.from(new Set(newDepts));
+
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (!e.dept) return e;
+        const mapped = Object.prototype.hasOwnProperty.call(renameMap, e.dept) ? renameMap[e.dept] : e.dept;
+        return { ...e, dept: mapped || "" };
+      })
+    );
+
+    setSelectedDepts((prev) => {
+      const next = new Set();
+      prev.forEach((d) => {
+        const mapped = Object.prototype.hasOwnProperty.call(renameMap, d) ? renameMap[d] : d;
+        if (mapped) next.add(mapped);
+      });
+      dedupedNewDepts.forEach((nd) => {
+        if (!depts.includes(nd)) next.add(nd);
+      });
+      return next;
+    });
+
+    setDepts(dedupedNewDepts);
+    setDeptModalStage(null);
+  };
+
+  const closeDeptModal = () => setDeptModalStage(null);
+
+  /* ============================== 렌더 ============================== */
+
+  return (
+    <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-24 sm:p-6">
+      <div className="mx-auto max-w-3xl">
+        {/* ---------------- 헤더 ---------------- */}
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500 text-white shadow-sm shadow-violet-200">
+            <Sparkles size={20} />
+          </div>
+          <div>
+            <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">초등 학사 · 근무 현황 플래너</h1>
+            <p className="text-xs text-slate-400">학년 · 부서별 일정과 관리자 근무 현황을 한눈에</p>
+          </div>
+        </div>
+
+        {/* ---------------- 탭 & 날짜 이동 ---------------- */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
+          <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+            <button
+              onClick={() => setTab("month")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                tab === "month" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <CalendarDays size={15} /> 월별 일정
+            </button>
+            <button
+              onClick={() => setTab("week")}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                tab === "week" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <ClipboardList size={15} /> 주간 업무 현황
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button onClick={goPrev} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <ChevronLeft size={18} />
+            </button>
+            <span className="min-w-[90px] text-center text-sm font-bold text-slate-700">{tab === "month" ? monthLabel : weekLabel}</span>
+            <button onClick={goNext} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <ChevronRight size={18} />
+            </button>
+            <button onClick={goToday} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+              오늘
+            </button>
+          </div>
+        </div>
+
+        {/* ---------------- 필터 ---------------- */}
+        <div className="mb-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+          <FilterRow
+            label="학년"
+            items={GRADES}
+            selected={selectedGrades}
+            onToggle={(v) => toggleInSet(selectedGrades, setSelectedGrades, v)}
+            onAll={() => setSelectedGrades(new Set(GRADES))}
+            onNone={() => setSelectedGrades(new Set())}
+          />
+          <FilterRow
+            label="담당 부서"
+            items={depts}
+            selected={selectedDepts}
+            onToggle={(v) => toggleInSet(selectedDepts, setSelectedDepts, v)}
+            onAll={() => setSelectedDepts(new Set(depts))}
+            onNone={() => setSelectedDepts(new Set())}
+            editAction={
+              <button
+                onClick={openDeptEdit}
+                className="flex items-center gap-1 rounded-lg bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-600 hover:bg-violet-200"
+                title="마스터 권한으로 부서명 수정"
+              >
+                <Pencil size={11} /> 부서명 수정
+              </button>
+            }
+          />
+          <p className="text-[11px] text-slate-400">* 학년 · 부서가 미지정인 일정은 필터와 관계없이 항상 표시됩니다.</p>
+        </div>
+
+        {/* ---------------- 일정 추가 버튼 ---------------- */}
+        <div className="mb-3 flex justify-end">
+          <button
+            onClick={() => openAddEvent(tab === "month" ? ymd(today) : ymd(weekDates[0]))}
+            className="flex items-center gap-1 rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600"
+          >
+            <Plus size={14} /> 일정 추가
+          </button>
+        </div>
+
+        {/* ---------------- 본문 ---------------- */}
+        {tab === "month" ? (
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+            {monthDays.map((d, idx) => (
+              <DateRow
+                key={ymd(d)}
+                date={d}
+                today={today}
+                events={eventsByDate[ymd(d)] || []}
+                isLast={idx === monthDays.length - 1}
+                onAddEvent={openAddEvent}
+                onOpenEvent={openEditEvent}
+              />
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+              {weekDates.map((d, idx) => (
+                <DateRow
+                  key={ymd(d)}
+                  date={d}
+                  today={today}
+                  events={eventsByDate[ymd(d)] || []}
+                  isLast={idx === weekDates.length - 1}
+                  onAddEvent={openAddEvent}
+                  onOpenEvent={openEditEvent}
+                />
+              ))}
+            </div>
+
+            {/* ---------------- 관리자 근무 현황 카드 (주간 업무 하단) ---------------- */}
+            <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-extrabold text-slate-700">관리자 근무 현황</h2>
+                  <span className="text-xs font-semibold text-slate-300">{weekLabel}</span>
+                </div>
+                <button
+                  onClick={openAdminInput}
+                  className="flex items-center gap-1 rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600"
+                >
+                  <Lock size={12} /> 입력
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {ADMIN_ROLES.map((role) => {
+                  const text = currentWeekTexts[role];
+                  return (
+                    <div key={role} className="rounded-xl bg-slate-50 p-3">
+                      <p className="mb-1 text-xs font-extrabold text-slate-500">{role}</p>
+                      <p className={`whitespace-pre-wrap text-[13px] leading-snug ${text ? "text-slate-600" : "text-slate-300"}`}>
+                        {text || "특이사항 없음"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ---------------- 일정 추가/수정 모달 ---------------- */}
+      {eventModal && (
+        <Modal title={eventModal.mode === "add" ? "일정 추가" : "일정 수정"} onClose={closeEventModal} wide>
+          <div className="space-y-3">
+            <div>
+              <FieldLabel>날짜</FieldLabel>
+              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputCls} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>담당 부서</FieldLabel>
+                <select value={form.dept} onChange={(e) => setForm({ ...form, dept: e.target.value })} className={inputCls}>
+                  <option value="">미지정</option>
+                  {depts.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>학년 / 구분</FieldLabel>
+                <select value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} className={inputCls}>
+                  <option value="">미지정</option>
+                  {GRADES.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel>행사 내용</FieldLabel>
+              <textarea
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                rows={3}
+                className={inputCls}
+                placeholder="예) 디지털새싹캠프(9:00~12:00, AI실, 5~6학년 10명)"
+              />
+            </div>
+
+            {eventModal.mode === "add" ? (
+              <div>
+                <FieldLabel>비밀번호 (수정/삭제 시 사용할 숫자 4자리)</FieldLabel>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                  className={inputCls}
+                  placeholder="숫자 4자리"
+                />
+              </div>
+            ) : (
+              <div>
+                <FieldLabel>비밀번호 (숫자 4자리)</FieldLabel>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={pwCheckInput}
+                  onChange={(e) => setPwCheckInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  className={inputCls}
+                  placeholder="등록 시 설정한 비밀번호"
+                />
+              </div>
+            )}
+
+            {pwCheckError && <p className="text-xs font-semibold text-rose-500">{pwCheckError}</p>}
+
+            <div className="flex items-center gap-2 pt-1">
+              {eventModal.mode === "edit" && (
+                <button
+                  onClick={deleteEvent}
+                  className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-100"
+                >
+                  <Trash2 size={15} /> 삭제
+                </button>
+              )}
+              <button
+                onClick={closeEventModal}
+                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button onClick={saveEvent} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600">
+                {eventModal.mode === "add" ? "추가" : "수정"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ---------------- 관리자 근무 현황: 비밀번호 확인 모달 ---------------- */}
+      {adminModalStage === "password" && (
+        <Modal title="관리자 인증" onClose={closeAdminModal}>
+          <FieldLabel>마스터 비밀번호</FieldLabel>
+          <input
+            type="password"
+            autoFocus
+            value={adminPwInput}
+            onChange={(e) => setAdminPwInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitAdminPassword()}
+            className={inputCls}
+            placeholder="비밀번호를 입력하세요"
+          />
+          {adminPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{adminPwError}</p>}
+          <button onClick={submitAdminPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600">
+            확인
+          </button>
+          <p className="mt-2 text-center text-[11px] text-slate-300">기본 마스터 비밀번호: {MASTER_PASSWORD_DEFAULT}</p>
+        </Modal>
+      )}
+
+      {/* ---------------- 관리자 근무 현황: 편집 모달 ---------------- */}
+      {adminModalStage === "edit" && (
+        <Modal title={`관리자 근무 현황 작성 · ${weekLabel}`} onClose={closeAdminModal} wide>
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+            {ADMIN_ROLES.map((role) => (
+              <div key={role}>
+                <FieldLabel>{role}</FieldLabel>
+                <textarea
+                  value={adminFormTexts[role] || ""}
+                  onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
+                  rows={2}
+                  className={inputCls}
+                  placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회(11:00~16:30, 청라커넬웨이 일대)"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              onClick={closeAdminModal}
+              className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50"
+            >
+              취소
+            </button>
+            <button onClick={saveAdminTexts} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600">
+              저장
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ---------------- 부서명 수정: 비밀번호 확인 모달 ---------------- */}
+      {deptModalStage === "password" && (
+        <Modal title="마스터 인증" onClose={closeDeptModal}>
+          <FieldLabel>마스터 비밀번호</FieldLabel>
+          <input
+            type="password"
+            autoFocus
+            value={deptPwInput}
+            onChange={(e) => setDeptPwInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitDeptPassword()}
+            className={inputCls}
+            placeholder="비밀번호를 입력하세요"
+          />
+          {deptPwError && <p className="mt-2 text-xs font-semibold text-rose-500">{deptPwError}</p>}
+          <button onClick={submitDeptPassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600">
+            확인
+          </button>
+          <p className="mt-2 text-center text-[11px] text-slate-300">기본 마스터 비밀번호: {MASTER_PASSWORD_DEFAULT}</p>
+        </Modal>
+      )}
+
+      {/* ---------------- 부서명 수정: 편집 모달 ---------------- */}
+      {deptModalStage === "edit" && (
+        <Modal title="담당 부서명 수정" onClose={closeDeptModal} wide>
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+            {deptEditRows.map((row) => (
+              <div key={row.key} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={row.value}
+                  onChange={(e) => updateDeptRow(row.key, e.target.value)}
+                  className={inputCls}
+                  placeholder="부서명"
+                />
+                <button
+                  onClick={() => removeDeptRow(row.key)}
+                  className="shrink-0 rounded-lg p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-500"
+                  title="이 부서 삭제"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={addDeptRow}
+            className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 py-2 text-xs font-bold text-slate-400 hover:border-violet-300 hover:text-violet-500"
+          >
+            <Plus size={14} /> 부서 추가
+          </button>
+
+          <p className="mt-2 text-[11px] text-slate-400">* 부서명을 삭제하면 해당 부서로 등록된 일정은 '미지정'으로 변경됩니다.</p>
+
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              onClick={closeDeptModal}
+              className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50"
+            >
+              취소
+            </button>
+            <button onClick={saveDeptEdits} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600">
+              저장
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ----------------------------- 필터 행 ----------------------------- */
+
+function FilterRow({ label, items, selected, onToggle, onAll, onNone, editAction }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-500">{label}</span>
+          {editAction}
+        </div>
+        <div className="flex gap-1">
+          <button onClick={onAll} className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200">
+            일괄 선택
+          </button>
+          <button onClick={onNone} className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-200">
+            일괄 해제
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => {
+          const active = selected.has(item);
+          return (
+            <button
+              key={item}
+              onClick={() => onToggle(item)}
+              className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                active ? getTagStyle(item) : "border-slate-200 bg-white text-slate-300 hover:text-slate-400"
+              }`}
+            >
+              {item}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
