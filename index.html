@@ -518,7 +518,6 @@ function App() {
 ]
 `;
 
-    // 지원 가능한 모델 후보 목록을 순차 시도
     const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"];
     let parsedList = null;
     let lastError = null;
@@ -544,13 +543,12 @@ function App() {
         let rawOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
         rawOutput = rawOutput.replace(/```json/g, "").replace(/```/g, "").trim();
 
-        // JSON 파싱 시도
         const match = rawOutput.match(/\[[\s\S]*\]/);
         const jsonStr = match ? match[0] : rawOutput;
         parsedList = JSON.parse(jsonStr);
         if (Array.isArray(parsedList) && parsedList.length > 0) {
           lastError = null;
-          break; // 성공 시 루프 탈출
+          break;
         }
       } catch (err) {
         lastError = err;
