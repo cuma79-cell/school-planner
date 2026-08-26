@@ -478,7 +478,7 @@ function App() {
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
-  // ==================== [Gemini 자연어 등록 & 자연어 삭제 통합 AI 핸들러] ====================
+  // ==================== [Gemini 자연어 등록 & 삭제 통합 AI 엔진 (키별 유효 모델 실시간 매칭)] ====================
   const handleAiSubmit = async (e) => {
     e?.preventDefault();
     if (!aiChatInput.trim()) return;
@@ -505,79 +505,94 @@ function App() {
 [가능한 학년]: ${availableGrades}
 [가능한 관리자 직책]: ${availableAdminRoles}
 
-사용자의 입력 의도를 분석하여 반드시 JSON 객체({ action: "add"|"delete", items: [...] }) 형식으로만 출력하세요:
+사용자의 입력 의도를 분석하여 반드시 JSON 객체({ "action": "add"|"delete", "items": [...] }) 형식으로만 출력하세요. 마크다운이나 추가 설명은 절대 출력하지 마세요:
 
 1. [등록 (add)]:
 - 일반 학사 일정: { "type": "event", "date": "YYYY-MM-DD", "dept": "부서명", "grade": "학년", "content": "행사내용" }
 - 관리자 근무: { "type": "admin", "date": "YYYY-MM-DD", "adminRole": "직책", "content": "근무내용" }
 
 2. [삭제 (delete)]: 사용자가 삭제, 취소, 지워줘 등을 요구할 때
-- 일반 학사 일정 삭제: { "type": "event", "date": "YYYY-MM-DD (날짜가 명시되면 계산, 없으면 null)", "keyword": "삭제할 일정의 핵심 키워드 (예: 행사 취합)" }
-- 관리자 근무 삭제: { "type": "admin", "date": "YYYY-MM-DD (계산된 날짜)", "adminRole": "직책 (교장, 교감 등)", "keyword": "특정 내용 또는 전체" }
+- 일반 학사 일정 삭제: { "type": "event", "date": "YYYY-MM-DD (날짜 명시 시 계산, 없으면 null)", "keyword": "삭제할 일정의 핵심 키워드 (예: 행사 취합)" }
+- 관리자 근무 삭제: { "type": "admin", "date": "YYYY-MM-DD (계산된 날짜)", "adminRole": "직책 (교장, 교감(교무) 등)", "keyword": "특정 내용 또는 전체" }
 
-출력 형식 (Markdown 태그 일체 제외, 순수 JSON만 출력):
+출력 형식 예시:
 {
-  "action": "add" 또는 "delete",
+  "action": "add",
   "items": [ ... ]
 }
 `;
 
     const cleanKey = geminiKey.trim();
-    const candidateUrls = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${cleanKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`,
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${cleanKey}`
-    ];
-
-    let aiResult = null;
-    let lastError = null;
-
-    for (const url of candidateUrls) {
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": cleanKey
-          },
-          body: JSON.stringify({
-            contents: [
-              { role: "user", parts: [{ text: `${systemPrompt}\n\n사용자 입력: "${aiChatInput}"` }] }
-            ]
-          })
-        });
-
-        if (!response.ok) {
-          const errJson = await response.json().catch(() => ({}));
-          throw new Error(errJson?.error?.message || `HTTP ${response.status}`);
-        }
-
-        const resData = await response.json();
-        let rawOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-        rawOutput = rawOutput.replace(/```json/g, "").replace(/```/g, "").trim();
-
-        const match = rawOutput.match(/\{[\s\S]*\}/);
-        const jsonStr = match ? match[0] : rawOutput;
-        aiResult = JSON.parse(jsonStr);
-        if (aiResult && aiResult.items) {
-          lastError = null;
-          break;
-        }
-      } catch (err) {
-        lastError = err;
-      }
-    }
-
-    if (!aiResult || !aiResult.items || aiResult.items.length === 0) {
-      setAiFeedback(`⚠️ 분석 오류: ${lastError ? lastError.message : "입력 내용을 분석하지 못했습니다. 다시 시도해 주세요."}`);
-      setAiIsLoading(false);
-      return;
-    }
 
     try {
+      // 1. 해당 키에서 사용 가능한 모델 목록 실시간 조회
+      let activeModels = [];
+      try {
+        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
+          headers: { "x-goog-api-key": cleanKey }
+        });
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          activeModels = (listData.models || [])
+            .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
+            .map(m => m.name.replace(/^models\//, ""));
+        }
+      } catch (err) {}
+
+      // fallback 모델 후보군 구성
+      const candidateModels = Array.from(new Set([
+        ...activeModels,
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-pro"
+      ]));
+
+      let aiResult = null;
+      let lastError = null;
+
+      for (const model of candidateModels) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": cleanKey
+            },
+            body: JSON.stringify({
+              contents: [
+                { role: "user", parts: [{ text: `${systemPrompt}\n\n사용자 입력: "${aiChatInput}"` }] }
+              ]
+            })
+          });
+
+          if (!res.ok) {
+            const errJson = await res.json().catch(() => ({}));
+            throw new Error(errJson?.error?.message || `HTTP ${res.status}`);
+          }
+
+          const resData = await res.json();
+          let rawOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+          rawOutput = rawOutput.replace(/```json/g, "").replace(/```/g, "").trim();
+
+          const match = rawOutput.match(/\{[\s\S]*\}/);
+          const jsonStr = match ? match[0] : rawOutput;
+          aiResult = JSON.parse(jsonStr);
+          if (aiResult && aiResult.items) {
+            lastError = null;
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!aiResult || !aiResult.items || aiResult.items.length === 0) {
+        throw new Error(lastError ? lastError.message : "입력 내용을 분석하지 못했습니다. 다시 시도해 주세요.");
+      }
+
       if (aiResult.action === "delete") {
-        // [자연어 삭제 로직]
+        // [자연어 삭제 처리]
         let deletedEventCount = 0;
         let deletedAdminCount = 0;
 
@@ -630,7 +645,7 @@ function App() {
         setAiChatInput("");
         setAiFeedback(`🗑️ 삭제 완료: 일정 ${deletedEventCount}건, 관리자 근무 ${deletedAdminCount}건이 삭제되었습니다.`);
       } else {
-        // [자연어 등록 로직]
+        // [자연어 등록 처리]
         const newEvents = [];
         const adminUpdatesToProcess = [];
 
@@ -684,7 +699,7 @@ function App() {
               week_key: wk,
               data: updatedMap[wk]
             }));
-            await supabase.from('admin_status').upsert(upsertRows);
+            await supabase.from('admin_status').upsert(rows => upsertRows);
           }
           setAdminWorkStatus(updatedMap);
         }
@@ -695,7 +710,7 @@ function App() {
 
       setTimeout(() => setAiFeedback(""), 6000);
     } catch (err) {
-      setAiFeedback(`⚠️ 처리 오류: ${err.message}`);
+      setAiFeedback(`⚠️ 오류: ${err.message}`);
     } finally {
       setAiIsLoading(false);
     }
@@ -1173,43 +1188,6 @@ function App() {
     setAdminModalStage("edit");
   };
 
-  const formatTextWithGivenDate = (rawText, dateStr) => {
-    const trimmed = (rawText || "").trim();
-    if (!trimmed) return "";
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return trimmed;
-      const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
-      if (/^\d{1,2}\s*\([월화수목금토일]\)/.test(trimmed)) return trimmed;
-      return `${dayStr} ${trimmed}`;
-    } catch { return trimmed; }
-  };
-
-  const stageCurrentAdminItem = () => {
-    const trimmed = adminCurrentInput.trim();
-    if (!trimmed) return;
-    const formatted = formatTextWithGivenDate(trimmed, adminTargetDate);
-    const d = new Date(adminTargetDate);
-    const wKey = ymd(startOfWeekMon(d));
-    const sharedArr = Array.from(adminSharedRoles);
-    setStagedAdminItems(prev => [
-      ...prev,
-      {
-        id: `stg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        date: adminTargetDate,
-        weekKey: wKey,
-        role: adminTargetRole,
-        sharedRoles: sharedArr,
-        content: formatted
-      }
-    ]);
-    setAdminCurrentInput("");
-  };
-
-  const removeStagedItem = (id) => {
-    setStagedAdminItems(prev => prev.filter(item => item.id !== id));
-  };
-
   const saveAdminTexts = async () => {
     const targetWKey = modalWeekCalculated.key;
 
@@ -1223,7 +1201,7 @@ function App() {
       return;
     }
 
-    // 개별 직책 직접 편집 저장 지원
+    // 개별 직책 직접 편집 저장
     const updatedMap = { ...adminWorkStatus };
     const curData = { ...(updatedMap[targetWKey] || {}) };
     curData[adminTargetRole] = adminFormTexts[adminTargetRole] || "특이사항 없음";
