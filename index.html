@@ -366,9 +366,6 @@ function App() {
   const [adminModalStage, setAdminModalStage] = useState(null);
   const [adminTargetRole, setAdminTargetRole] = useState(null);
   const [adminTargetDate, setAdminTargetDate] = useState(ymd(today));
-  const [adminSharedRoles, setAdminSharedRoles] = useState(new Set());
-  const [adminCurrentInput, setAdminCurrentInput] = useState("");
-  const [stagedAdminItems, setStagedAdminItems] = useState([]);
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
   const [adminFormTexts, setAdminFormTexts] = useState({});
@@ -462,7 +459,7 @@ function App() {
   const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} ~ ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
   const currentWeekTexts = adminWorkStatus[weekKey] || {};
 
-  // ==================== [Gemini 초고속 자연어 간편 등록 전용 핸들러] ====================
+  // ==================== [Gemini 초고속 자연어 간편 등록 (gemini-3.6-flash 대응)] ====================
   const handleAiSubmit = async (e) => {
     e?.preventDefault();
     if (!aiChatInput.trim()) return;
@@ -506,7 +503,7 @@ function App() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${cleanKey}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1694,13 +1691,13 @@ function App() {
           </Modal>
         )}
 
-        {/* 7. 관리자 근무 현황 직접 수정 및 삭제 모달 (로드 및 편집 지원) */}
+        {/* 7. 관리자 근무 현황 직접 수정 및 삭제 모달 */}
         {adminModalStage === "edit" && (
           <Modal title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 직접 수정` : `관리자 주간 근무 현황 일괄 수정`} onClose={closeAdminModal} wide>
             <div className="space-y-4">
               <div className="rounded-xl bg-violet-50/70 p-3 border border-violet-100 flex items-center justify-between text-xs">
                 <span className="text-slate-500 font-semibold">적용 주간: <b className="text-violet-700 font-bold">{weekLabel}</b></span>
-                <span className="text-[11px] text-slate-400">내용을 비우면 '특이사항 없음'으로 자동 변경됩니다</span>
+                <span className="text-[11px] text-slate-400">내용을 비우면 '특이사항 없음'으로 자동 처리됩니다</span>
               </div>
 
               {adminTargetRole && adminTargetRole !== 'ALL' ? (
