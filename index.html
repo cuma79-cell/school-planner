@@ -226,18 +226,48 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
   const rowBg = isToday ? "bg-emerald-50/70" : isHoliday ? "bg-rose-50/40" : dow === 6 ? "bg-blue-50/30" : "bg-white";
   const dateColor = isToday ? "text-emerald-600" : isHoliday ? "text-rose-500 font-black" : dow === 6 ? "text-blue-400" : "text-slate-500";
 
-  // 요청하신 엄격한 정렬 규칙 적용:
-  // 1. 전체 행사 (dept가 비어있고 grade가 비어있는 경우) 무조건 최상단 (-1)
-  // 2. 그 외 부서/학년 일정은 그 아래에 위치 (+1)
-  // 3. 같은 그룹(전체행사끼리 혹은 부서/학년끼리) 내부에서는 행사 내용(content) 가나다순 오름차순 정렬
+  // 요청하신 엄격한 정렬 규칙 구현:
+  // 0순위: 전체 행사 (dept 비어있음 && grade 비어있음) -> 최상단
+  // 1순위: 담당 부서가 있는 경우 -> 부서명 가나다순 (localeCompare)
+  // 2순위: 학년이 지정된 경우 -> 지정된 학년 순서 ("유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년")
+  // 동일한 부서나 동일한 학년이 겹칠 경우 행사명(content) 가나다순 오름차순 정렬
+  const gradeOrder = GRADES; // ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"]
+
   const sortedEvents = [...events].sort((a, b) => {
     const isAAll = !a.dept && !a.grade;
     const isBAll = !b.dept && !b.grade;
 
-    if (isAAll && !isBAll) return -1; // A가 전체 행사고 B가 아니면 A가 위로
-    if (!isAAll && isBAll) return 1;  // B가 전체 행사고 A가 아니면 B가 위로
+    // 0순위: 전체 행사 최상단
+    if (isAAll && !isBAll) return -1;
+    if (!isAAll && isBAll) return 1;
+    if (isAAll && isBAll) {
+      return (a.content || "").localeCompare(b.content || "", "ko");
+    }
 
-    // 둘 다 전체 행사이거나 둘 다 부서/학년 일정인 경우 가나다순 정렬
+    const hasADept = !!a.dept;
+    const hasBDept = !!b.dept;
+
+    // 1순위(부서)가 있는 항목이 2순위(학년만 있는 항목)보다 우선
+    if (hasADept && !hasBDept) return -1;
+    if (!hasADept && hasBDept) return 1;
+
+    // 둘 다 부서가 있는 경우 (1순위 간 비교: 부서명 가나다순, 같으면 행사명 가나다순)
+    if (hasADept && hasBDept) {
+      const deptCompare = (a.dept || "").localeCompare(b.dept || "", "ko");
+      if (deptCompare !== 0) return deptCompare;
+      return (a.content || "").localeCompare(b.content || "", "ko");
+    }
+
+    // 둘 다 학년만 있는 경우 (2순위 간 비교: 학년 순서, 같으면 행사명 가나다순)
+    const gradeIdxA = gradeOrder.indexOf(a.grade);
+    const gradeIdxB = gradeOrder.indexOf(b.grade);
+    const safeIdxA = gradeIdxA !== -1 ? gradeIdxA : 999;
+    const safeIdxB = gradeIdxB !== -1 ? gradeIdxB : 999;
+
+    if (safeIdxA !== safeIdxB) {
+      return safeIdxA - safeIdxB;
+    }
+
     return (a.content || "").localeCompare(b.content || "", "ko");
   });
 
