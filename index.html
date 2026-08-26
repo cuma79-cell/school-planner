@@ -96,7 +96,7 @@ const KeyIcon = ({ size = 14, className = "" }) => (
 
 const GRADES = ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"];
 const INITIAL_DEPTS = ["교무기획", "교육정보", "교육연구", "안전자치", "특수교육", "문화체육", "학생생활", "과학환경", "행정실", "늘봄지원"];
-const ADMIN_ROLES = ["교장", "교감(교무)", "교감(생활)", "행정실장"];
+const INITIAL_ADMIN_ROLES = ["교장", "교감(교무)", "교감(생활)", "행정실장"];
 const WEEKDAY_KOR = ["일", "월", "화", "수", "목", "금", "토"];
 const MASTER_PASSWORD_DEFAULT = "1234";
 
@@ -216,7 +216,7 @@ function parseCSV(text) {
   return result;
 }
 
-function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customHolidays }) {
+function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customHolidays, adminRoles, depts }) {
   const dateStr = ymd(date);
   const dow = date.getDay();
   const isToday = sameDay(date, today);
@@ -226,12 +226,11 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
   const rowBg = isToday ? "bg-emerald-50/70" : isHoliday ? "bg-rose-50/40" : dow === 6 ? "bg-blue-50/30" : "bg-white";
   const dateColor = isToday ? "text-emerald-600" : isHoliday ? "text-rose-500 font-black" : dow === 6 ? "text-blue-400" : "text-slate-500";
 
-  // 요청하신 엄격한 정렬 규칙 구현:
-  // 0순위: 전체 행사 (dept 비어있음 && grade 비어있음) -> 최상단
-  // 1순위: 담당 부서가 있는 경우 -> 부서명 가나다순 (localeCompare)
-  // 2순위: 학년이 지정된 경우 -> 지정된 학년 순서 ("유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년")
-  // 동일한 부서나 동일한 학년이 겹칠 경우 행사명(content) 가나다순 오름차순 정렬
-  const gradeOrder = GRADES; // ["유치원", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"]
+  // 정렬 순서 정의:
+  // 0순위: 전체 행사 (dept 비어있고 grade 비어있음)
+  // 1순위: 담당 부서 (depts 목록에 포함된 부서) -> 부서명 가나다순
+  // 2순위: 학년 (GRADES 목록에 포함된 학년) -> 유치원, 1학년 ~ 6학년 순서
+  const gradeOrder = GRADES;
 
   const sortedEvents = [...events].sort((a, b) => {
     const isAAll = !a.dept && !a.grade;
@@ -247,18 +246,18 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
     const hasADept = !!a.dept;
     const hasBDept = !!b.dept;
 
-    // 1순위(부서)가 있는 항목이 2순위(학년만 있는 항목)보다 우선
+    // 1순위(부서)가 2순위(학년)보다 우선
     if (hasADept && !hasBDept) return -1;
     if (!hasADept && hasBDept) return 1;
 
-    // 둘 다 부서가 있는 경우 (1순위 간 비교: 부서명 가나다순, 같으면 행사명 가나다순)
+    // 둘 다 부서가 있는 경우 (부서명 가나다순, 같으면 행사 내용 가나다순)
     if (hasADept && hasBDept) {
       const deptCompare = (a.dept || "").localeCompare(b.dept || "", "ko");
       if (deptCompare !== 0) return deptCompare;
       return (a.content || "").localeCompare(b.content || "", "ko");
     }
 
-    // 둘 다 학년만 있는 경우 (2순위 간 비교: 학년 순서, 같으면 행사명 가나다순)
+    // 둘 다 학년이 있는 경우 (유치원 ~ 6학년 순서, 같으면 행사 내용 가나다순)
     const gradeIdxA = gradeOrder.indexOf(a.grade);
     const gradeIdxB = gradeOrder.indexOf(b.grade);
     const safeIdxA = gradeIdxA !== -1 ? gradeIdxA : 999;
@@ -350,6 +349,15 @@ function App() {
 
   const [copiedEvent, setCopiedEvent] = useState(null);
 
+  // 관리자 직책 명칭 목록 상태 관리
+  const [adminRoles, setAdminRoles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sp_admin_roles")) || INITIAL_ADMIN_ROLES; } catch { return INITIAL_ADMIN_ROLES; }
+  });
+  const [adminRoleModalStage, setAdminRoleModalStage] = useState(null);
+  const [adminRolePwInput, setAdminRolePwInput] = useState("");
+  const [adminRolePwError, setAdminRolePwError] = useState("");
+  const [adminRoleEditRows, setAdminRoleEditRows] = useState([]);
+
   // 엑셀 업로드 모달 상태
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadParsedEvents, setUploadParsedEvents] = useState([]);
@@ -433,6 +441,9 @@ function App() {
           if (item.week_key === 'custom_holidays_data') {
             setCustomHolidays(item.data || {});
             localStorage.setItem("sp_custom_holidays", JSON.stringify(item.data || {}));
+          } else if (item.week_key === 'admin_roles_data') {
+            setAdminRoles(item.data || INITIAL_ADMIN_ROLES);
+            localStorage.setItem("sp_admin_roles", JSON.stringify(item.data || INITIAL_ADMIN_ROLES));
           } else {
             map[item.week_key] = item.data;
           }
@@ -502,6 +513,41 @@ function App() {
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
+  // ==================== [관리자 직책 명칭 수정 모달 핸들러] ====================
+  const openAdminRoleEdit = () => {
+    setAdminRolePwInput("");
+    setAdminRolePwError("");
+    setAdminRoleModalStage("password");
+  };
+
+  const submitAdminRolePassword = () => {
+    if (adminRolePwInput !== masterPassword) {
+      setAdminRolePwError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setAdminRoleEditRows(adminRoles.map((r, i) => ({ key: `r${i}`, value: r })));
+    setAdminRoleModalStage("edit");
+  };
+
+  const updateAdminRoleRow = (key, value) => {
+    setAdminRoleEditRows(prev => prev.map(r => r.key === key ? { ...r, value } : r));
+  };
+
+  const saveAdminRoleEdits = async () => {
+    const newRoles = adminRoleEditRows.map(r => r.value.trim()).filter(v => v.length > 0);
+    const dedupedRoles = Array.from(new Set(newRoles));
+    if (dedupedRoles.length === 0) return;
+
+    setAdminRoles(dedupedRoles);
+    localStorage.setItem("sp_admin_roles", JSON.stringify(dedupedRoles));
+
+    if (supabase) {
+      // admin_status 테이블에 특수 키로 관리자 직책 목록 저장
+      await supabase.from('admin_status').upsert([{ week_key: 'admin_roles_data', data: dedupedRoles }]);
+    }
+    setAdminRoleModalStage(null);
+  };
+
   // ==================== [엑셀 샘플 양식 다운로드 & 업로드 파싱] ====================
   const handleDownloadSampleTemplate = () => {
     const sampleRows = [
@@ -553,8 +599,8 @@ function App() {
           }
 
           if (dateStr && content.trim()) {
-            if (dept === "관리자근무" || ADMIN_ROLES.includes(col4)) {
-              const targetRole = ADMIN_ROLES.includes(col4) ? col4 : "교감(교무)";
+            if (dept === "관리자근무" || adminRoles.includes(col4)) {
+              const targetRole = adminRoles.includes(col4) ? col4 : adminRoles[1] || "교감(교무)";
               const d = new Date(dateStr);
               if (!isNaN(d.getTime())) {
                 const wKey = ymd(startOfWeekMon(d));
@@ -710,7 +756,7 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            ${ADMIN_ROLES.map(r => `
+            ${adminRoles.map(r => `
               <tr>
                 <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; font-weight:bold; background-color:#fafafa;">${r}</td>
                 <td style="border:1px solid #cbd5e1; padding:8px; white-space:pre-wrap; color:#334155;">${currentWeekTexts[r] || "특이사항 없음"}</td>
@@ -780,7 +826,7 @@ function App() {
       csvRows.push([]);
       csvRows.push(["[2. 관리자 주간 근무 현황]"]);
       csvRows.push(["직책", "근무 및 출장 내용"]);
-      ADMIN_ROLES.forEach(r => { csvRows.push([r, currentWeekTexts[r] || "특이사항 없음"]); });
+      adminRoles.forEach(r => { csvRows.push([r, currentWeekTexts[r] || "특이사항 없음"]); });
     }
 
     const csvString = csvRows.map(row => row.map(cell => {
@@ -960,7 +1006,7 @@ function App() {
     
     if (adminTargetRole === 'ALL') {
       const base = {};
-      ADMIN_ROLES.forEach((r) => {
+      adminRoles.forEach((r) => {
         const val = savedData[r];
         base[r] = (val && val !== "특이사항 없음") ? val : "";
       });
@@ -1020,7 +1066,7 @@ function App() {
     const curData = { ...(updatedMap[targetWKey] || {}) };
 
     if (adminTargetRole === 'ALL') {
-      ADMIN_ROLES.forEach(r => {
+      adminRoles.forEach(r => {
         const text = (adminFormTexts[r] || "").trim();
         curData[r] = text ? text : "특이사항 없음";
       });
@@ -1280,30 +1326,34 @@ function App() {
         {tab === "month" ? (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 mb-8">
             {monthDays.map((d, idx) => (
-              <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === monthDays.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} customHolidays={customHolidays} />
+              <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === monthDays.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} customHolidays={customHolidays} adminRoles={adminRoles} depts={depts} />
             ))}
           </div>
         ) : (
           <>
             <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
               {weekDates.map((d, idx) => (
-                <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === weekDates.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} customHolidays={customHolidays} />
+                <DateRow key={ymd(d)} date={d} today={today} events={eventsByDate[ymd(d)] || []} isLast={idx === weekDates.length - 1} onAddEvent={openAddEvent} onOpenEvent={openEditEvent} customHolidays={customHolidays} adminRoles={adminRoles} depts={depts} />
               ))}
             </div>
 
             {/* 관리자 근무 현황 카드 */}
             <div className="mt-4 mb-8 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <h2 className="text-sm font-extrabold text-slate-700">관리자 근무 현황</h2>
                   <span className="text-xs font-semibold text-slate-300">{weekLabel}</span>
+                  {/* 관리자 직책 명칭 수정 버튼 추가 */}
+                  <button onClick={openAdminRoleEdit} className="ml-1 flex items-center gap-0.5 rounded bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-600 hover:bg-violet-200 transition" title="관리자 직책 명칭 수정">
+                    <PencilIcon size={10} /> 직책명 수정
+                  </button>
                 </div>
                 <button onClick={() => openAdminInput('ALL')} className="flex items-center gap-1 rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600 transition">
                   <LockIcon size={12} /> 입력
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                {ADMIN_ROLES.map((role) => {
+                {adminRoles.map((role) => {
                   const text = currentWeekTexts[role];
                   return (
                     <div key={role} onClick={() => openAdminInput(role)} className="group relative cursor-pointer rounded-xl bg-slate-50 p-3.5 transition hover:bg-violet-50/60 hover:ring-1 hover:ring-violet-300" title={`${role} 근무 현황 입력`}>
@@ -1444,6 +1494,35 @@ function App() {
               <div className="pt-2">
                 <button onClick={handleResetMasterPassword} className="w-full rounded-xl border border-rose-100 bg-rose-50/70 py-2 text-xs font-bold text-rose-500 hover:bg-rose-100 transition">비밀번호 초기화</button>
               </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* 2-1. 관리자 직책명 수정 인증 모달 */}
+        {adminRoleModalStage === "password" && (
+          <Modal title="관리자 직책명 수정 인증" onClose={() => setAdminRoleModalStage(null)}>
+            <FieldLabel>마스터 비밀번호</FieldLabel>
+            <input type="password" autoFocus value={adminRolePwInput} onChange={(e) => setAdminRolePwInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitAdminRolePassword()} className={inputCls} placeholder="마스터 비밀번호 입력" />
+            {adminRolePwError && <p className="mt-2 text-xs font-semibold text-rose-500">{adminRolePwError}</p>}
+            <button onClick={submitAdminRolePassword} className="mt-4 w-full rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">확인</button>
+          </Modal>
+        )}
+
+        {/* 2-2. 관리자 직책명 편집 모달 */}
+        {adminRoleModalStage === "edit" && (
+          <Modal title="관리자 직책 명칭 수정" onClose={() => setAdminRoleModalStage(null)} wide>
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+              {adminRoleEditRows.map((row) => (
+                <div key={row.key} className="flex items-center gap-2">
+                  <input type="text" value={row.value} onChange={(e) => updateAdminRoleRow(row.key, e.target.value)} className={inputCls} placeholder="직책명" />
+                  <button onClick={() => setAdminRoleEditRows(prev => prev.filter(r => r.key !== row.key))} title="이 직책 삭제" className="shrink-0 rounded-lg p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition"><XIcon size={16} /></button>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setAdminRoleEditRows(prev => [...prev, { key: `r${Date.now()}`, value: "" }])} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 py-2 text-xs font-bold text-slate-400 hover:border-violet-300 hover:text-violet-500 transition"><PlusIcon size={14} /> 직책 추가</button>
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={() => setAdminRoleModalStage(null)} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+              <button onClick={saveAdminRoleEdits} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">저장</button>
             </div>
           </Modal>
         )}
@@ -1595,7 +1674,7 @@ function App() {
                   <div className="pt-2 border-t border-violet-200/60">
                     <p className="text-[11px] font-bold text-violet-700 mb-1.5">동행 관리자 함께 등록 (선택 시 2명 이상에게 동시에 입력됩니다)</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {ADMIN_ROLES.filter(r => r !== adminTargetRole).map((r) => {
+                      {adminRoles.filter(r => r !== adminTargetRole).map((r) => {
                         const isChecked = adminSharedRoles.has(r);
                         return (
                           <button key={r} type="button" onClick={() => toggleInSet(adminSharedRoles, setAdminSharedRoles, r)} className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"}`}>
@@ -1656,7 +1735,7 @@ function App() {
               </div>
             ) : (
               <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-                {ADMIN_ROLES.map((role) => (
+                {adminRoles.map((role) => (
                   <div key={role}>
                     <FieldLabel>{role}</FieldLabel>
                     <textarea value={adminFormTexts[role] || ""} onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })} rows={2} className={inputCls} placeholder="예) 28(금) 출장" />
@@ -1699,7 +1778,7 @@ function App() {
             <button onClick={addDeptRow} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 py-2 text-xs font-bold text-slate-400 hover:border-violet-300 hover:text-violet-500 transition"><PlusIcon size={14} /> 부서 추가</button>
             <p className="mt-2 text-[11px] text-slate-400">* 부서명을 삭제하면 해당 부서로 등록된 일정은 '미지정'으로 변경됩니다.</p>
             <div className="mt-4 flex items-center gap-2">
-              <button onClick={closeDeptModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+              <button onClick={closeDeptModal} className="flex-1 rounded-xl border border-slate-200 bg-white py.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
               <button onClick={saveDeptEdits} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition">저장</button>
             </div>
           </Modal>
