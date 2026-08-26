@@ -123,9 +123,9 @@ const PALETTE = [
 
 const AI_EXAMPLES = [
   "다음주 화요일 6학년 빛소리터 장애이해교육 2교시",
-  "25일 행사 취합 삭제",
+  "내일 3교시 5학년 강당 학교폭력예방교육 학생생활부",
   "다음주 수요일 교감(교무) 서구청 출장",
-  "28일 교장 근무 상황 삭제"
+  "금요일 교장 회의 참석"
 ];
 
 function hashStr(s) {
@@ -478,7 +478,7 @@ function App() {
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
-  // ==================== [Gemini 자연어 등록 & 삭제 통합 AI 엔진 (키별 유효 모델 실시간 매칭)] ====================
+  // ==================== [Gemini 자연어 일정 및 관리자 근무 등록 (gemini-3.6-flash 대응)] ====================
   const handleAiSubmit = async (e) => {
     e?.preventDefault();
     if (!aiChatInput.trim()) return;
@@ -498,219 +498,150 @@ function App() {
     const availableAdminRoles = ADMIN_ROLES.join(", ");
 
     const systemPrompt = `
-당신은 학교 학사 일정 및 관리자 근무현황 등록/삭제 AI 비서입니다.
-현재 날짜: ${todayStr} (${WEEKDAY_KOR[today.getDay()]}요일), 현재 연도: 2026년.
+당신은 학교 학사 일정 및 관리자 근무현황 등록 도우미입니다. 사용자의 자연어 입력을 분석하여 JSON 형식으로만 응답해야 합니다.
+현재 날짜는 ${todayStr} (${WEEKDAY_KOR[today.getDay()]}요일) 입니다.
 
-[가능한 부서]: ${availableDepts}
-[가능한 학년]: ${availableGrades}
-[가능한 관리자 직책]: ${availableAdminRoles}
+[가능한 부서 목록]: ${availableDepts}
+[가능한 학년 목록]: ${availableGrades}
+[가능한 관리자 직책 목록]: ${availableAdminRoles} (교장, 교감(교무), 교감(생활), 행정실장)
 
-사용자의 입력 의도를 분석하여 반드시 JSON 객체({ "action": "add"|"delete", "items": [...] }) 형식으로만 출력하세요. 마크다운이나 추가 설명은 절대 출력하지 마세요:
+분류 규칙:
+1. 입력 내용이 학교 전체 행사, 학년/부서 행사일 경우 type을 "event"로 설정하고, date(YYYY-MM-DD), dept, grade, content를 채우세요.
+2. 입력 내용이 교장, 교감, 행정실장 등의 출장, 연가, 자율장학, 회의 등 관리자 근무/출장일 경우 type을 "admin"으로 설정하고, date(YYYY-MM-DD), adminRole(위 직책 중 하나), content를 채우세요. (날짜가 요일이나 상대 날짜일 경우 현재 날짜(${todayStr}) 기준으로 정확한 YYYY-MM-DD로 계산하세요.)
 
-1. [등록 (add)]:
-- 일반 학사 일정: { "type": "event", "date": "YYYY-MM-DD", "dept": "부서명", "grade": "학년", "content": "행사내용" }
-- 관리자 근무: { "type": "admin", "date": "YYYY-MM-DD", "adminRole": "직책", "content": "근무내용" }
-
-2. [삭제 (delete)]: 사용자가 삭제, 취소, 지워줘 등을 요구할 때
-- 일반 학사 일정 삭제: { "type": "event", "date": "YYYY-MM-DD (날짜 명시 시 계산, 없으면 null)", "keyword": "삭제할 일정의 핵심 키워드 (예: 행사 취합)" }
-- 관리자 근무 삭제: { "type": "admin", "date": "YYYY-MM-DD (계산된 날짜)", "adminRole": "직책 (교장, 교감(교무) 등)", "keyword": "특정 내용 또는 전체" }
-
-출력 형식 예시:
-{
-  "action": "add",
-  "items": [ ... ]
-}
+반드시 아래와 같은 순수 JSON 배열([]) 형태로만 출력하세요. 마크다운(\`\`\`json 등)이나 추가 설명 문장은 일체 제외하세요:
+[
+  {
+    "type": "event", 
+    "date": "YYYY-MM-DD",
+    "dept": "부서명 또는 빈문자열",
+    "grade": "학년명 또는 빈문자열",
+    "content": "행사 내용"
+  },
+  {
+    "type": "admin",
+    "date": "YYYY-MM-DD",
+    "adminRole": "교장 또는 교감(교무) 등",
+    "content": "근무 및 출장 내용"
+  }
+]
 `;
 
     const cleanKey = geminiKey.trim();
+    const candidateUrls = [
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${cleanKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${cleanKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${cleanKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${cleanKey}`
+    ];
+
+    let parsedList = null;
+    let lastError = null;
+
+    for (const url of candidateUrls) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": cleanKey
+          },
+          body: JSON.stringify({
+            contents: [
+              { role: "user", parts: [{ text: `${systemPrompt}\n\n사용자 입력: "${aiChatInput}"` }] }
+            ]
+          })
+        });
+
+        if (!response.ok) {
+          const errJson = await response.json().catch(() => ({}));
+          throw new Error(errJson?.error?.message || `HTTP ${response.status}`);
+        }
+
+        const resData = await response.json();
+        let rawOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        rawOutput = rawOutput.replace(/```json/g, "").replace(/```/g, "").trim();
+
+        const match = rawOutput.match(/\[[\s\S]*\]/);
+        const jsonStr = match ? match[0] : rawOutput;
+        parsedList = JSON.parse(jsonStr);
+        if (Array.isArray(parsedList) && parsedList.length > 0) {
+          lastError = null;
+          break;
+        }
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (!parsedList || !Array.isArray(parsedList) || parsedList.length === 0) {
+      setAiFeedback(`⚠️ 등록 오류: ${lastError ? lastError.message : "정보를 분석하지 못했습니다. 입력 내용을 확인해주세요."}`);
+      setAiIsLoading(false);
+      return;
+    }
 
     try {
-      // 1. 해당 키에서 사용 가능한 모델 목록 실시간 조회
-      let activeModels = [];
-      try {
-        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`, {
-          headers: { "x-goog-api-key": cleanKey }
-        });
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          activeModels = (listData.models || [])
-            .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
-            .map(m => m.name.replace(/^models\//, ""));
-        }
-      } catch (err) {}
+      const newEvents = [];
+      const adminUpdatesToProcess = [];
 
-      // fallback 모델 후보군 구성
-      const candidateModels = Array.from(new Set([
-        ...activeModels,
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-pro"
-      ]));
-
-      let aiResult = null;
-      let lastError = null;
-
-      for (const model of candidateModels) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": cleanKey
-            },
-            body: JSON.stringify({
-              contents: [
-                { role: "user", parts: [{ text: `${systemPrompt}\n\n사용자 입력: "${aiChatInput}"` }] }
-              ]
-            })
+      parsedList.forEach((item, idx) => {
+        if (item.type === "admin" && item.adminRole && ADMIN_ROLES.includes(item.adminRole)) {
+          const d = new Date(item.date || todayStr);
+          if (!isNaN(d.getTime())) {
+            const wKey = ymd(startOfWeekMon(d));
+            const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
+            const formattedContent = `${dayStr} ${item.content}`;
+            adminUpdatesToProcess.push({ weekKey: wKey, role: item.adminRole, content: formattedContent });
+          }
+        } else {
+          newEvents.push({
+            id: Math.floor(Date.now() % 2147483647) + idx,
+            date: item.date || todayStr,
+            dept: item.dept || "",
+            grade: item.grade || "",
+            content: item.content || aiChatInput.trim(),
+            password: "1234"
           });
-
-          if (!res.ok) {
-            const errJson = await res.json().catch(() => ({}));
-            throw new Error(errJson?.error?.message || `HTTP ${res.status}`);
-          }
-
-          const resData = await res.json();
-          let rawOutput = resData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-          rawOutput = rawOutput.replace(/```json/g, "").replace(/```/g, "").trim();
-
-          const match = rawOutput.match(/\{[\s\S]*\}/);
-          const jsonStr = match ? match[0] : rawOutput;
-          aiResult = JSON.parse(jsonStr);
-          if (aiResult && aiResult.items) {
-            lastError = null;
-            break;
-          }
-        } catch (err) {
-          lastError = err;
         }
+      });
+
+      if (newEvents.length > 0 && supabase) {
+        const { error } = await supabase.from('events').insert(newEvents);
+        if (error) throw new Error("DB 일정 저장 실패: " + error.message);
+        setEvents(prev => [...prev, ...newEvents]);
       }
 
-      if (!aiResult || !aiResult.items || aiResult.items.length === 0) {
-        throw new Error(lastError ? lastError.message : "입력 내용을 분석하지 못했습니다. 다시 시도해 주세요.");
-      }
+      if (adminUpdatesToProcess.length > 0) {
+        const updatedMap = { ...adminWorkStatus };
+        const weekKeysToUpsert = new Set();
 
-      if (aiResult.action === "delete") {
-        // [자연어 삭제 처리]
-        let deletedEventCount = 0;
-        let deletedAdminCount = 0;
-
-        for (const item of aiResult.items) {
-          if (item.type === "admin" && item.adminRole) {
-            const d = new Date(item.date || todayStr);
-            if (!isNaN(d.getTime())) {
-              const wKey = ymd(startOfWeekMon(d));
-              const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
-              const updatedMap = { ...adminWorkStatus };
-              const curData = { ...(updatedMap[wKey] || {}) };
-              const currentRoleText = curData[item.adminRole] || "";
-
-              if (currentRoleText && currentRoleText !== "특이사항 없음") {
-                const lines = currentRoleText.split("\n");
-                const filteredLines = lines.filter(line => {
-                  const hasDay = line.startsWith(dayStr);
-                  const hasKeyword = item.keyword && item.keyword !== "전체" ? line.includes(item.keyword) : true;
-                  return !(hasDay && hasKeyword);
-                });
-                curData[item.adminRole] = filteredLines.length > 0 ? filteredLines.join("\n") : "특이사항 없음";
-                updatedMap[wKey] = curData;
-
-                if (supabase) {
-                  await supabase.from('admin_status').upsert([{ week_key: wKey, data: curData }]);
-                }
-                setAdminWorkStatus(updatedMap);
-                deletedAdminCount++;
-              }
-            }
+        adminUpdatesToProcess.forEach(up => {
+          weekKeysToUpsert.add(up.weekKey);
+          const curData = { ...(updatedMap[up.weekKey] || {}) };
+          const oldVal = curData[up.role] && curData[up.role] !== "특이사항 없음" ? curData[up.role].trim() : "";
+          if (oldVal) {
+            if (!oldVal.includes(up.content)) curData[up.role] = `${oldVal}\n${up.content}`;
           } else {
-            // 일반 학사 일정 삭제
-            const targetEvents = events.filter(e => {
-              const dateMatch = !item.date || e.date === item.date;
-              const contentMatch = item.keyword ? e.content.includes(item.keyword) : true;
-              return dateMatch && contentMatch;
-            });
-
-            if (targetEvents.length > 0) {
-              const targetIds = targetEvents.map(e => e.id);
-              if (supabase) {
-                await supabase.from('events').delete().in('id', targetIds);
-              }
-              setEvents(prev => prev.filter(e => !targetIds.includes(e.id)));
-              deletedEventCount += targetEvents.length;
-            }
+            curData[up.role] = up.content;
           }
-        }
-
-        setAiChatInput("");
-        setAiFeedback(`🗑️ 삭제 완료: 일정 ${deletedEventCount}건, 관리자 근무 ${deletedAdminCount}건이 삭제되었습니다.`);
-      } else {
-        // [자연어 등록 처리]
-        const newEvents = [];
-        const adminUpdatesToProcess = [];
-
-        aiResult.items.forEach((item, idx) => {
-          if (item.type === "admin" && item.adminRole && ADMIN_ROLES.includes(item.adminRole)) {
-            const d = new Date(item.date || todayStr);
-            if (!isNaN(d.getTime())) {
-              const wKey = ymd(startOfWeekMon(d));
-              const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
-              const formattedContent = `${dayStr} ${item.content}`;
-              adminUpdatesToProcess.push({ weekKey: wKey, role: item.adminRole, content: formattedContent });
-            }
-          } else {
-            newEvents.push({
-              id: Math.floor(Date.now() % 2147483647) + idx,
-              date: item.date || todayStr,
-              dept: item.dept || "",
-              grade: item.grade || "",
-              content: item.content || aiChatInput.trim(),
-              password: "1234"
-            });
-          }
+          updatedMap[up.weekKey] = curData;
         });
 
-        if (newEvents.length > 0) {
-          if (supabase) {
-            const { error } = await supabase.from('events').insert(newEvents);
-            if (error) throw new Error("DB 일정 저장 실패: " + error.message);
-          }
-          setEvents(prev => [...prev, ...newEvents]);
+        if (supabase) {
+          const upsertRows = Array.from(weekKeysToUpsert).map(wk => ({
+            week_key: wk,
+            data: updatedMap[wk]
+          }));
+          await supabase.from('admin_status').upsert(upsertRows);
         }
-
-        if (adminUpdatesToProcess.length > 0) {
-          const updatedMap = { ...adminWorkStatus };
-          const weekKeysToUpsert = new Set();
-
-          adminUpdatesToProcess.forEach(up => {
-            weekKeysToUpsert.add(up.weekKey);
-            const curData = { ...(updatedMap[up.weekKey] || {}) };
-            const oldVal = curData[up.role] && curData[up.role] !== "특이사항 없음" ? curData[up.role].trim() : "";
-            if (oldVal) {
-              if (!oldVal.includes(up.content)) curData[up.role] = `${oldVal}\n${up.content}`;
-            } else {
-              curData[up.role] = up.content;
-            }
-            updatedMap[up.weekKey] = curData;
-          });
-
-          if (supabase) {
-            const upsertRows = Array.from(weekKeysToUpsert).map(wk => ({
-              week_key: wk,
-              data: updatedMap[wk]
-            }));
-            await supabase.from('admin_status').upsert(rows => upsertRows);
-          }
-          setAdminWorkStatus(updatedMap);
-        }
-
-        setAiChatInput("");
-        setAiFeedback(`✨ AI 등록 완료: 일정 ${newEvents.length}건, 관리자 근무 ${adminUpdatesToProcess.length}건이 등록되었습니다.`);
+        setAdminWorkStatus(updatedMap);
       }
 
+      setAiChatInput("");
+      setAiFeedback(`✨ AI가 성공적으로 등록했습니다! (${newEvents.length}개 일정, ${adminUpdatesToProcess.length}개 관리자 근무)`);
       setTimeout(() => setAiFeedback(""), 6000);
     } catch (err) {
-      setAiFeedback(`⚠️ 오류: ${err.message}`);
+      setAiFeedback(`⚠️ 저장 오류: ${err.message}`);
     } finally {
       setAiIsLoading(false);
     }
@@ -1188,10 +1119,46 @@ function App() {
     setAdminModalStage("edit");
   };
 
-  const saveAdminTexts = async () => {
-    const targetWKey = modalWeekCalculated.key;
+  const formatTextWithGivenDate = (rawText, dateStr) => {
+    const trimmed = (rawText || "").trim();
+    if (!trimmed) return "";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return trimmed;
+      const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
+      if (/^\d{1,2}\s*\([월화수목금토일]\)/.test(trimmed)) return trimmed;
+      return `${dayStr} ${trimmed}`;
+    } catch { return trimmed; }
+  };
 
+  const stageCurrentAdminItem = () => {
+    const trimmed = adminCurrentInput.trim();
+    if (!trimmed) return;
+    const formatted = formatTextWithGivenDate(trimmed, adminTargetDate);
+    const d = new Date(adminTargetDate);
+    const wKey = ymd(startOfWeekMon(d));
+    const sharedArr = Array.from(adminSharedRoles);
+    setStagedAdminItems(prev => [
+      ...prev,
+      {
+        id: `stg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        date: adminTargetDate,
+        weekKey: wKey,
+        role: adminTargetRole,
+        sharedRoles: sharedArr,
+        content: formatted
+      }
+    ]);
+    setAdminCurrentInput("");
+  };
+
+  const removeStagedItem = (id) => {
+    setStagedAdminItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const saveAdminTexts = async () => {
     if (adminTargetRole === 'ALL') {
+      const targetWKey = modalWeekCalculated.key;
       const updatedData = { ...adminFormTexts };
       if (supabase) {
         await supabase.from('admin_status').upsert([{ week_key: targetWKey, data: updatedData }]);
@@ -1201,14 +1168,51 @@ function App() {
       return;
     }
 
-    // 개별 직책 직접 편집 저장
+    let itemsToProcess = [...stagedAdminItems];
+    if (adminCurrentInput.trim()) {
+      const formatted = formatTextWithGivenDate(adminCurrentInput.trim(), adminTargetDate);
+      const d = new Date(adminTargetDate);
+      const wKey = ymd(startOfWeekMon(d));
+      const sharedArr = Array.from(adminSharedRoles);
+      itemsToProcess.push({
+        id: 'direct',
+        date: adminTargetDate,
+        weekKey: wKey,
+        role: adminTargetRole,
+        sharedRoles: sharedArr,
+        content: formatted
+      });
+    }
+
+    if (itemsToProcess.length === 0) {
+      setAdminModalStage(null);
+      return;
+    }
+
     const updatedMap = { ...adminWorkStatus };
-    const curData = { ...(updatedMap[targetWKey] || {}) };
-    curData[adminTargetRole] = adminFormTexts[adminTargetRole] || "특이사항 없음";
-    updatedMap[targetWKey] = curData;
+    const weekKeysToUpsert = new Set();
+    itemsToProcess.forEach(item => {
+      const wKey = item.weekKey;
+      weekKeysToUpsert.add(wKey);
+      const curData = { ...(updatedMap[wKey] || {}) };
+      const targetRoles = [item.role, ...item.sharedRoles];
+      targetRoles.forEach(r => {
+        const oldVal = curData[r] && curData[r] !== "특이사항 없음" ? curData[r].trim() : "";
+        if (oldVal) {
+          if (!oldVal.includes(item.content)) curData[r] = `${oldVal}\n${item.content}`;
+        } else {
+          curData[r] = item.content;
+        }
+      });
+      updatedMap[wKey] = curData;
+    });
 
     if (supabase) {
-      await supabase.from('admin_status').upsert([{ week_key: targetWKey, data: curData }]);
+      const upsertRows = Array.from(weekKeysToUpsert).map(wk => ({
+        week_key: wk,
+        data: updatedMap[wk]
+      }));
+      await supabase.from('admin_status').upsert(upsertRows);
     }
     setAdminWorkStatus(updatedMap);
     setAdminModalStage(null);
@@ -1406,15 +1410,15 @@ function App() {
           <p className="text-[11px] text-slate-400">* 학년/부서가 미지정인 일정은 필터와 관계없이 항상 표시됩니다.</p>
         </div>
 
-        {/* ===== [위치: 담당 부서 필터 바로 밑] Gemini AI 자연어 등록 및 삭제 통합 채팅창 ===== */}
+        {/* ===== [위치: 담당 부서 필터 바로 밑] Gemini AI 자연어 간편 일정 및 관리자 근무 등록 채팅창 ===== */}
         <div className="mb-4 rounded-2xl bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 p-3.5 shadow-sm ring-1 ring-violet-200/70">
           <form onSubmit={handleAiSubmit} className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-1.5 text-xs font-extrabold text-violet-900">
                 <SparklesIcon size={14} className="text-violet-600" />
-                <span>Gemini AI 간편 등록 및 자연어 삭제 비서</span>
+                <span>Gemini AI 간편 일정 및 관리자 근무 등록</span>
               </div>
-              <span className="text-[11px] text-violet-500">일정 등록 및 삭제("25일 행사 취합 삭제", "28일 교장 근무 삭제") 지원</span>
+              <span className="text-[11px] text-violet-500">학사 일정 및 교장·교감·실장 근무를 자연어로 입력하세요</span>
             </div>
             
             <div className="relative flex items-center">
@@ -1423,7 +1427,7 @@ function App() {
                 value={aiChatInput}
                 onChange={(e) => setAiChatInput(e.target.value)}
                 disabled={aiIsLoading}
-                placeholder="예) 25일 행사 취합 삭제 / 다음주 화요일 6학년 장애이해교육 / 28일 교장 출장 삭제"
+                placeholder="예) 다음주 화요일 6학년 장애이해교육 / 다음주 수요일 교감(교무) 출장"
                 className="w-full rounded-xl border border-violet-200 bg-white/95 py-2.5 pl-3.5 pr-20 text-xs sm:text-sm text-slate-800 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 disabled:bg-slate-100"
               />
               <button
@@ -1439,7 +1443,7 @@ function App() {
                   <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                 ) : (
                   <>
-                    <span>실행</span>
+                    <span>등록</span>
                     <SendIcon size={12} />
                   </>
                 )}
@@ -1506,17 +1510,17 @@ function App() {
                   <span className="text-xs font-semibold text-slate-300">{weekLabel}</span>
                 </div>
                 <button onClick={() => openAdminInput('ALL')} className="flex items-center gap-1 rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600 transition">
-                  <LockIcon size={12} /> 전체 입력
+                  <LockIcon size={12} /> 입력
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {ADMIN_ROLES.map((role) => {
                   const text = currentWeekTexts[role];
                   return (
-                    <div key={role} onClick={() => openAdminInput(role)} className="group relative cursor-pointer rounded-xl bg-slate-50 p-3.5 transition hover:bg-violet-50/60 hover:ring-1 hover:ring-violet-300" title={`${role} 근무 현황 직접 수정 및 삭제`}>
+                    <div key={role} onClick={() => openAdminInput(role)} className="group relative cursor-pointer rounded-xl bg-slate-50 p-3.5 transition hover:bg-violet-50/60 hover:ring-1 hover:ring-violet-300" title={`${role} 근무 현황 입력`}>
                       <div className="mb-1.5 flex items-center justify-between">
                         <p className="text-xs font-extrabold text-slate-600 group-hover:text-violet-600">{role}</p>
-                        <span className="text-[11px] font-semibold text-violet-400 opacity-0 transition group-hover:opacity-100">수정 / 삭제 ✎</span>
+                        <span className="text-[11px] font-semibold text-violet-400 opacity-0 transition group-hover:opacity-100">수정 ✎</span>
                       </div>
                       <p className={`whitespace-pre-wrap text-[13px] leading-snug ${text ? "text-slate-600" : "text-slate-300"}`}>
                         {text || "특이사항 없음"}
@@ -1808,58 +1812,85 @@ function App() {
           </Modal>
         )}
 
-        {/* 7. 관리자 근무 현황 직접 수정 및 삭제 모달 */}
+        {/* 7. 관리자 근무 현황 작성 모달 */}
         {adminModalStage === "edit" && (
-          <Modal title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 직접 수정` : `관리자 주간 근무 현황 일괄 수정`} onClose={closeAdminModal} wide>
-            <div className="space-y-4">
-              <div className="rounded-xl bg-violet-50/70 p-3 border border-violet-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-semibold">적용 주간: <b className="text-violet-700 font-bold">{modalWeekCalculated.label}</b></span>
-                <span className="text-[11px] text-slate-400">내용을 비우면 '특이사항 없음'으로 자동 처리됩니다</span>
-              </div>
+          <Modal title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성` : `관리자 근무 현황 작성`} onClose={closeAdminModal} wide>
+            {adminTargetRole && adminTargetRole !== 'ALL' ? (
+              <div className="space-y-3.5">
+                <div className="rounded-xl bg-violet-50/70 p-3 border border-violet-100 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <FieldLabel>기준 날짜 (해당 일자가 내용 앞에 자동 표시)</FieldLabel>
+                      <input type="date" value={adminTargetDate} onChange={(e) => setAdminTargetDate(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-400" />
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[11px] font-bold text-slate-400 block">적용 주간</span>
+                      <span className="text-xs font-extrabold text-violet-600">{modalWeekCalculated.label} {modalWeekCalculated.dayStr && `[${modalWeekCalculated.dayStr}]`}</span>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-violet-200/60">
+                    <p className="text-[11px] font-bold text-violet-700 mb-1.5">동행 관리자 함께 등록 (선택 시 동일 내용이 함께 저장됩니다)</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ADMIN_ROLES.filter(r => r !== adminTargetRole).map((r) => {
+                        const isChecked = adminSharedRoles.has(r);
+                        return (
+                          <button key={r} type="button" onClick={() => toggleInSet(adminSharedRoles, setAdminSharedRoles, r)} className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"}`}>
+                            {isChecked ? `✓ ${r}` : `+ ${r}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
 
-              {adminTargetRole && adminTargetRole !== 'ALL' ? (
                 <div>
-                  <FieldLabel>{adminTargetRole} 근무 내용 (수정 및 삭제)</FieldLabel>
-                  <textarea
-                    value={adminFormTexts[adminTargetRole] || ""}
-                    onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [adminTargetRole]: e.target.value })}
-                    rows={4}
-                    className={inputCls}
-                    placeholder="예) 25(화) 09:00 교장단 협의회&#10;28(금) 서구청 출장"
-                  />
+                  <FieldLabel>{adminTargetRole} 근무 일정 내용</FieldLabel>
+                  <textarea value={adminCurrentInput} onChange={(e) => setAdminCurrentInput(e.target.value)} rows={3} className={inputCls} placeholder="예) 15:00~20:00 교감 자율장학 (날짜를 직접 적지 않아도 기준 날짜가 앞에 자동 추가됩니다)" />
                   <div className="mt-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setAdminFormTexts({ ...adminFormTexts, [adminTargetRole]: "" })}
-                      className="text-xs text-rose-500 hover:text-rose-700 font-bold flex items-center gap-1 transition"
-                    >
-                      <Trash2Icon size={12} /> 내용 전체 지우기
+                    <button type="button" onClick={stageCurrentAdminItem} disabled={!adminCurrentInput.trim()} className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition shadow-sm ${adminCurrentInput.trim() ? "bg-violet-100 text-violet-700 hover:bg-violet-200 border border-violet-200" : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"}`}>
+                      <PlusIcon size={13} /> 임시 추가 (다른 날짜 계속 담기)
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-                  {ADMIN_ROLES.map((role) => (
-                    <div key={role}>
-                      <FieldLabel>{role}</FieldLabel>
-                      <textarea
-                        value={adminFormTexts[role] || ""}
-                        onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
-                        rows={2}
-                        className={inputCls}
-                        placeholder="예) 28(금) [출장] 서구3지구 협의회"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
 
-              <div className="mt-4 flex items-center gap-2">
-                <button onClick={closeAdminModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
-                <button onClick={saveAdminTexts} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-md shadow-violet-200">
-                  저장 완료
-                </button>
+                {stagedAdminItems.length > 0 && (
+                  <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-3">
+                    <p className="text-xs font-bold text-violet-800 mb-2 flex items-center justify-between">
+                      <span>함께 저장될 스케줄 목록 ({stagedAdminItems.length}개)</span>
+                      <span className="text-[11px] font-normal text-slate-400">하단 [저장] 시 한 번에 등록됩니다</span>
+                    </p>
+                    <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                      {stagedAdminItems.map((item) => (
+                        <div key={item.id} className="flex items-start justify-between rounded-lg bg-white p-2 text-xs border border-violet-100 shadow-2xs">
+                          <div className="min-w-0 flex-1 pr-2">
+                            <p className="font-bold text-slate-700">{item.content}</p>
+                            {item.sharedRoles.length > 0 && (
+                              <p className="text-[10px] text-violet-600 font-semibold mt-0.5">동행: {item.sharedRoles.join(", ")}</p>
+                            )}
+                          </div>
+                          <button type="button" onClick={() => removeStagedItem(item.id)} className="text-slate-300 hover:text-rose-500 p-0.5 transition shrink-0" title="삭제"><XIcon size={14} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+            ) : (
+              <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
+                {ADMIN_ROLES.map((role) => (
+                  <div key={role}>
+                    <FieldLabel>{role}</FieldLabel>
+                    <textarea value={adminFormTexts[role] || ""} onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })} rows={2} className={inputCls} placeholder="예) 28(금) [출장] 서구3지구 교감단 자율장학협의회" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={closeAdminModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+              <button onClick={saveAdminTexts} className="flex-1 rounded-xl bg-violet-500 py-2.5 text-sm font-bold text-white hover:bg-violet-600 transition shadow-md shadow-violet-200">
+                {stagedAdminItems.length > 0 ? `일괄 저장 (${stagedAdminItems.length + (adminCurrentInput.trim() ? 1 : 0)}개)` : "저장"}
+              </button>
             </div>
           </Modal>
         )}
