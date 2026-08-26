@@ -226,6 +226,21 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
   const rowBg = isToday ? "bg-emerald-50/70" : isHoliday ? "bg-rose-50/40" : dow === 6 ? "bg-blue-50/30" : "bg-white";
   const dateColor = isToday ? "text-emerald-600" : isHoliday ? "text-rose-500 font-black" : dow === 6 ? "text-blue-400" : "text-slate-500";
 
+  // 요청하신 정렬 규칙 적용:
+  // 1. 전체 행사 (dept === "" 이고 grade === "") 무조건 최상단
+  // 2. 부서 또는 학년 디테일 (그 외)
+  // 3. 종류가 겹칠 경우 행사명(content) 가나다순 오름차순 정렬
+  const sortedEvents = [...events].sort((a, b) => {
+    const isASpecificAll = (!a.dept && !a.grade);
+    const isBSpecificAll = (!b.dept && !b.grade);
+
+    if (isASpecificAll && !isBSpecificAll) return -1;
+    if (!isASpecificAll && isBSpecificAll) return 1;
+
+    // 둘 다 전체 행사이거나 둘 다 부서/학년일 경우 내용(content) 가나다순 정렬
+    return (a.content || "").localeCompare(b.content || "", "ko");
+  });
+
   return (
     <div className={`flex gap-3 border-b border-slate-100 px-3 py-2.5 sm:px-4 min-h-[52px] ${rowBg} ${isLast ? "border-b-0" : ""}`}>
       <div className={`flex w-16 shrink-0 flex-col items-start pt-0.5 sm:w-20 ${dateColor}`}>
@@ -240,10 +255,10 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
         )}
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
-        {events.length === 0 ? (
+        {sortedEvents.length === 0 ? (
           <p className="pt-0.5 text-xs text-slate-300">-</p>
         ) : (
-          events.map((ev) => (
+          sortedEvents.map((ev) => (
             <button key={ev.id} onClick={() => onOpenEvent(ev)} className="flex w-full items-start gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-100/80 transition">
               <Badge className={getTagStyle(tagLabel(ev))}>{tagLabel(ev)}</Badge>
               <span className="pt-0.5 text-[13px] leading-snug text-slate-600">{ev.content}</span>
@@ -1114,7 +1129,7 @@ function App() {
           <div className="flex items-center gap-2.5">
             <img src="./logo.png" alt="경연초 교표" className="h-10 w-10 shrink-0 object-contain" />
             <div>
-              <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">경연초 월별·주간 행사 계획</h1>
+              <h1 className="text-lg font-extrabold text-slate-800 sm:text-xl">인천경연초등학교 학사·근무 현황 플래너</h1>
               <p className="text-xs text-slate-400">학년·부서별 일정과 관리자 근무 현황을 실시간 공유</p>
             </div>
           </div>
@@ -1664,7 +1679,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(getElementById('root')).render(<App />); // (참고: 빌드 시점 DOM 렌더링 유지)
 </script>
 </body>
 </html>
