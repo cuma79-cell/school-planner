@@ -362,10 +362,13 @@ function App() {
   const [pwCheckInput, setPwCheckInput] = useState("");
   const [pwCheckError, setPwCheckError] = useState("");
 
-  // 관리자 근무 입력 모달 상태
+  // 관리자 근무 입력 모달 상태 (다중 동행 선택 포함)
   const [adminModalStage, setAdminModalStage] = useState(null);
   const [adminTargetRole, setAdminTargetRole] = useState(null);
   const [adminTargetDate, setAdminTargetDate] = useState(ymd(today));
+  const [adminSharedRoles, setAdminSharedRoles] = useState(new Set());
+  const [adminCurrentInput, setAdminCurrentInput] = useState("");
+  const [stagedAdminItems, setStagedAdminItems] = useState([]);
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
   const [adminFormTexts, setAdminFormTexts] = useState({});
@@ -458,6 +461,22 @@ function App() {
   const weekKey = ymd(weekStart);
   const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} ~ ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
   const currentWeekTexts = adminWorkStatus[weekKey] || {};
+
+  const modalWeekCalculated = useMemo(() => {
+    try {
+      const d = new Date(adminTargetDate);
+      if (isNaN(d.getTime())) return { key: weekKey, label: weekLabel, dayStr: "" };
+      const wDates = getWeekdays(d);
+      const wSt = wDates[0];
+      const wEn = wDates[4];
+      const wK = ymd(wSt);
+      const wLbl = `${wSt.getMonth() + 1}/${wSt.getDate()} ~ ${wEn.getMonth() + 1}/${wEn.getDate()}`;
+      const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
+      return { key: wK, label: wLbl, dayStr };
+    } catch {
+      return { key: weekKey, label: weekLabel, dayStr: "" };
+    }
+  }, [adminTargetDate, weekKey, weekLabel]);
 
   // ==================== [Gemini 초고속 자연어 간편 등록 (gemini-3.6-flash 대응)] ====================
   const handleAiSubmit = async (e) => {
@@ -1052,9 +1071,13 @@ function App() {
     }
   };
 
+  // 관리자 근무 입력 모달 열기 (개별 또는 전체)
   const openAdminInput = (role = 'ALL') => {
     setAdminTargetRole(role);
     setAdminTargetDate(tab === "week" ? ymd(weekStart) : ymd(today));
+    setAdminSharedRoles(new Set());
+    setAdminCurrentInput("");
+    setStagedAdminItems([]);
     setAdminPwInput("");
     setAdminPwError("");
     setAdminModalStage("password");
@@ -1064,13 +1087,62 @@ function App() {
     if (adminPwInput !== masterPassword) { setAdminPwError("비밀번호가 일치하지 않습니다."); return; }
     const targetWKey = weekKey;
     const savedData = adminWorkStatus[targetWKey] || {};
-    const base = {};
-    ADMIN_ROLES.forEach((r) => {
-      const val = savedData[r];
-      base[r] = (val && val !== "특이사항 없음") ? val : "";
-    });
-    setAdminFormTexts(base);
+    
+    if (adminTargetRole === 'ALL') {
+      const base = {};
+      ADMIN_ROLES.forEach((r) => {
+        const val = savedData[r];
+        base[r] = (val && val !== "특이사항 없음") ? val : "";
+      });
+      setAdminFormTexts(base);
+    } else {
+      // 개별 카드를 클릭했을 때 기존에 저장된 내용을 텍스트박스에 로드
+      const val = savedData[adminTargetRole];
+      setAdminFormTexts({
+        [adminTargetRole]: (val && val !== "특이사항 없음") ? val : ""
+      });
+      setAdminCurrentInput("");
+      setStagedAdminItems([]);
+      setAdminSharedRoles(new Set());
+    }
     setAdminModalStage("edit");
+  };
+
+  const formatTextWithGivenDate = (rawText, dateStr) => {
+    const trimmed = (rawText || "").trim();
+    if (!trimmed) return "";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return trimmed;
+      const dayStr = `${d.getDate()}(${WEEKDAY_KOR[d.getDay()]})`;
+      if (/^\d{1,2}\s*\([월화수목금토일]\)/.test(trimmed)) return trimmed;
+      return `${dayStr} ${trimmed}`;
+    } catch { return trimmed; }
+  };
+
+  const stageCurrentAdminItem = () => {
+    const trimmed = adminCurrentInput.trim();
+    if (!trimmed) return;
+    const formatted = formatTextWithGivenDate(trimmed, adminTargetDate);
+    const d = new Date(adminTargetDate);
+    const wKey = ymd(startOfWeekMon(d));
+    const sharedArr = Array.from(adminSharedRoles);
+    setStagedAdminItems(prev => [
+      ...prev,
+      {
+        id: `stg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        date: adminTargetDate,
+        weekKey: wKey,
+        role: adminTargetRole,
+        sharedRoles: sharedArr,
+        content: formatted
+      }
+    ]);
+    setAdminCurrentInput("");
+  };
+
+  const removeStagedItem = (id) => {
+    setStagedAdminItems(prev => prev.filter(item => item.id !== id));
   };
 
   const saveAdminTexts = async () => {
@@ -1083,9 +1155,52 @@ function App() {
         const text = (adminFormTexts[r] || "").trim();
         curData[r] = text ? text : "특이사항 없음";
       });
+      updatedMap[targetWKey] = curData;
+
+      if (supabase) {
+        await supabase.from('admin_status').upsert([{ week_key: targetWKey, data: curData }]);
+      }
+      setAdminWorkStatus(updatedMap);
+      setAdminModalStage(null);
+      return;
+    }
+
+    // 개별 직책 저장 처리 (임시 추가 항목들과 직접 입력창 항목을 모두 반영)
+    let itemsToProcess = [...stagedAdminItems];
+    if (adminCurrentInput.trim()) {
+      const formatted = formatTextWithGivenDate(adminCurrentInput.trim(), adminTargetDate);
+      const d = new Date(adminTargetDate);
+      const wKey = ymd(startOfWeekMon(d));
+      const sharedArr = Array.from(adminSharedRoles);
+      itemsToProcess.push({
+        id: 'direct',
+        date: adminTargetDate,
+        weekKey: wKey,
+        role: adminTargetRole,
+        sharedRoles: sharedArr,
+        content: formatted
+      });
+    }
+
+    // 직접 텍스트박스에 수정한 내용이 있다면 이를 우선 반영하거나 병합
+    const directText = (adminFormTexts[adminTargetRole] || "").trim();
+    
+    if (itemsToProcess.length === 0) {
+      // 텍스트박스의 내용으로 직접 덮어쓰기 (전체 삭제 가능하도록 비우면 특이사항 없음)
+      curData[adminTargetRole] = directText ? directText : "특이사항 없음";
     } else {
-      const text = (adminFormTexts[adminTargetRole] || "").trim();
-      curData[adminTargetRole] = text ? text : "특이사항 없음";
+      // 임시 추가된 항목들과 병합 처리
+      const targetRoles = [adminTargetRole, ...Array.from(adminSharedRoles)];
+      itemsToProcess.forEach(item => {
+        targetRoles.forEach(r => {
+          const oldVal = curData[r] && curData[r] !== "특이사항 없음" ? curData[r].trim() : "";
+          if (oldVal) {
+            if (!oldVal.includes(item.content)) curData[r] = `${oldVal}\n${item.content}`;
+          } else {
+            curData[r] = item.content;
+          }
+        });
+      });
     }
 
     updatedMap[targetWKey] = curData;
@@ -1297,7 +1412,7 @@ function App() {
                 <SparklesIcon size={14} className="text-violet-600" />
                 <span>Gemini AI 간편 일정 및 관리자 근무 등록</span>
               </div>
-              <span className="text-[11px] text-violet-500">학사 일정 및 교장·교감·실장 근무를 자연어로 등록하세요</span>
+              <span className="text-[11px] text-violet-500">학사 일정 및 교장·교감·실장 근무를 자연어로 입력하세요</span>
             </div>
             
             <div className="relative flex items-center">
@@ -1306,7 +1421,7 @@ function App() {
                 value={aiChatInput}
                 onChange={(e) => setAiChatInput(e.target.value)}
                 disabled={aiIsLoading}
-                placeholder="예) 다음주 화요일 6학년 빛소리터 장애이해교육 2교시 / 다음주 수요일 교감(교무) 서구청 출장"
+                placeholder="예) 다음주 화요일 6학년 장애이해교육 / 다음주 수요일 교감(교무) 서구청 출장"
                 className="w-full rounded-xl border border-violet-200 bg-white/95 py-2.5 pl-3.5 pr-20 text-xs sm:text-sm text-slate-800 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 disabled:bg-slate-100"
               />
               <button
@@ -1389,17 +1504,17 @@ function App() {
                   <span className="text-xs font-semibold text-slate-300">{weekLabel}</span>
                 </div>
                 <button onClick={() => openAdminInput('ALL')} className="flex items-center gap-1 rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-600 transition">
-                  <LockIcon size={12} /> 전체 수정
+                  <LockIcon size={12} /> 입력
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {ADMIN_ROLES.map((role) => {
                   const text = currentWeekTexts[role];
                   return (
-                    <div key={role} onClick={() => openAdminInput(role)} className="group relative cursor-pointer rounded-xl bg-slate-50 p-3.5 transition hover:bg-violet-50/60 hover:ring-1 hover:ring-violet-300" title={`${role} 근무 현황 직접 수정 및 삭제`}>
+                    <div key={role} onClick={() => openAdminInput(role)} className="group relative cursor-pointer rounded-xl bg-slate-50 p-3.5 transition hover:bg-violet-50/60 hover:ring-1 hover:ring-violet-300" title={`${role} 근무 현황 입력`}>
                       <div className="mb-1.5 flex items-center justify-between">
                         <p className="text-xs font-extrabold text-slate-600 group-hover:text-violet-600">{role}</p>
-                        <span className="text-[11px] font-semibold text-violet-400 opacity-0 transition group-hover:opacity-100">수정 / 삭제 ✎</span>
+                        <span className="text-[11px] font-semibold text-violet-400 opacity-0 transition group-hover:opacity-100">수정 ✎</span>
                       </div>
                       <p className={`whitespace-pre-wrap text-[13px] leading-snug ${text ? "text-slate-600" : "text-slate-300"}`}>
                         {text || "특이사항 없음"}
@@ -1691,58 +1806,100 @@ function App() {
           </Modal>
         )}
 
-        {/* 7. 관리자 근무 현황 직접 수정 및 삭제 모달 */}
+        {/* 7. 관리자 근무 현황 작성 및 다중 동행 등록 모달 */}
         {adminModalStage === "edit" && (
-          <Modal title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 직접 수정` : `관리자 주간 근무 현황 일괄 수정`} onClose={closeAdminModal} wide>
-            <div className="space-y-4">
-              <div className="rounded-xl bg-violet-50/70 p-3 border border-violet-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-semibold">적용 주간: <b className="text-violet-700 font-bold">{weekLabel}</b></span>
-                <span className="text-[11px] text-slate-400">내용을 비우면 '특이사항 없음'으로 자동 처리됩니다</span>
-              </div>
+          <Modal title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성 및 수정` : `관리자 근무 현황 일괄 작성`} onClose={closeAdminModal} wide>
+            {adminTargetRole && adminTargetRole !== 'ALL' ? (
+              <div className="space-y-3.5">
+                <div className="rounded-xl bg-violet-50/70 p-3 border border-violet-100 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <FieldLabel>기준 날짜 (해당 일자가 내용 앞에 자동 표시)</FieldLabel>
+                      <input type="date" value={adminTargetDate} onChange={(e) => setAdminTargetDate(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-400" />
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[11px] font-bold text-slate-400 block">적용 주간</span>
+                      <span className="text-xs font-extrabold text-violet-600">{modalWeekCalculated.label} {modalWeekCalculated.dayStr && `[${modalWeekCalculated.dayStr}]`}</span>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-violet-200/60">
+                    <p className="text-[11px] font-bold text-violet-700 mb-1.5">동행 관리자 함께 등록 (선택 시 2명 이상에게 동시에 입력됩니다)</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ADMIN_ROLES.filter(r => r !== adminTargetRole).map((r) => {
+                        const isChecked = adminSharedRoles.has(r);
+                        return (
+                          <button key={r} type="button" onClick={() => toggleInSet(adminSharedRoles, setAdminSharedRoles, r)} className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${isChecked ? "bg-violet-600 text-white border-violet-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-violet-50"}`}>
+                            {isChecked ? `✓ ${r}` : `+ ${r}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
 
-              {adminTargetRole && adminTargetRole !== 'ALL' ? (
                 <div>
-                  <FieldLabel>{adminTargetRole} 근무 내용 (수정 및 삭제)</FieldLabel>
+                  <FieldLabel>{adminTargetRole} 근무 일정 내용 (수정 및 추가)</FieldLabel>
+                  <textarea value={adminCurrentInput} onChange={(e) => setAdminCurrentInput(e.target.value)} rows={3} className={inputCls} placeholder="예) 15:00~20:00 자율장학 (기준 날짜가 앞에 자동 추가됩니다)" />
+                  <div className="mt-2 flex justify-end">
+                    <button type="button" onClick={stageCurrentAdminItem} disabled={!adminCurrentInput.trim()} className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition shadow-sm ${adminCurrentInput.trim() ? "bg-violet-100 text-violet-700 hover:bg-violet-200 border border-violet-200" : "bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed"}`}>
+                      <PlusIcon size={13} /> 임시 추가 (다른 날짜 계속 담기)
+                    </button>
+                  </div>
+                </div>
+
+                {stagedAdminItems.length > 0 && (
+                  <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-3">
+                    <p className="text-xs font-bold text-violet-800 mb-2 flex items-center justify-between">
+                      <span>함께 저장될 스케줄 목록 ({stagedAdminItems.length}개)</span>
+                    </p>
+                    <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                      {stagedAdminItems.map((item) => (
+                        <div key={item.id} className="flex items-start justify-between rounded-lg bg-white p-2 text-xs border border-violet-100 shadow-2xs">
+                          <div className="min-w-0 flex-1 pr-2">
+                            <p className="font-bold text-slate-700">{item.content}</p>
+                            {item.sharedRoles.length > 0 && (
+                              <p className="text-[10px] text-violet-600 font-semibold mt-0.5">동행: {item.sharedRoles.join(", ")}</p>
+                            )}
+                          </div>
+                          <button type="button" onClick={() => removeStagedItem(item.id)} className="text-slate-300 hover:text-rose-500 p-0.5 transition shrink-0" title="삭제"><XIcon size={14} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <FieldLabel>현재 저장된 전체 내용 직접 편집 및 삭제</FieldLabel>
                   <textarea
                     value={adminFormTexts[adminTargetRole] || ""}
                     onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [adminTargetRole]: e.target.value })}
-                    rows={5}
+                    rows={3}
                     className={inputCls}
-                    placeholder="예) 3(목) 10:00~12:00 교감단 회의&#10;2(수) 서구청 출장"
+                    placeholder="기존 내역 직접 수정 또는 전체 지우기 가능"
                   />
-                  <div className="mt-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setAdminFormTexts({ ...adminFormTexts, [adminTargetRole]: "" })}
-                      className="text-xs text-rose-500 hover:text-rose-700 font-bold flex items-center gap-1 transition"
-                    >
+                  <div className="mt-1 flex justify-end">
+                    <button type="button" onClick={() => setAdminFormTexts({ ...adminFormTexts, [adminTargetRole]: "" })} className="text-xs text-rose-500 hover:text-rose-700 font-bold flex items-center gap-1 transition">
                       <Trash2Icon size={12} /> 내용 전체 지우기
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-                  {ADMIN_ROLES.map((role) => (
-                    <div key={role}>
-                      <FieldLabel>{role}</FieldLabel>
-                      <textarea
-                        value={adminFormTexts[role] || ""}
-                        onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })}
-                        rows={2}
-                        className={inputCls}
-                        placeholder="예) 28(금) [출장] 서구3지구 협의회"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-4 flex items-center gap-2">
-                <button onClick={closeAdminModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
-                <button onClick={saveAdminTexts} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-md shadow-violet-200">
-                  수정 완료
-                </button>
               </div>
+            ) : (
+              <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
+                {ADMIN_ROLES.map((role) => (
+                  <div key={role}>
+                    <FieldLabel>{role}</FieldLabel>
+                    <textarea value={adminFormTexts[role] || ""} onChange={(e) => setAdminFormTexts({ ...adminFormTexts, [role]: e.target.value })} rows={2} className={inputCls} placeholder="예) 28(금) 출장" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={closeAdminModal} className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition">취소</button>
+              <button onClick={saveAdminTexts} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition shadow-md shadow-violet-200">
+                {stagedAdminItems.length > 0 ? `일괄 저장 (${stagedAdminItems.length + (adminCurrentInput.trim() ? 1 : 0)}개)` : "저장 완료"}
+              </button>
             </div>
           </Modal>
         )}
