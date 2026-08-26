@@ -478,7 +478,7 @@ function App() {
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
-  // ==================== [Gemini 자연어 일정 및 관리자 근무현황 통합 등록 핸들러 (v1 / v1beta 자동 지원)] ====================
+  // ==================== [Gemini 자연어 일정 및 관리자 근무현황 통합 등록 핸들러 (최신 다중 엔드포인트 자동 전환)] ====================
   const handleAiSubmit = async (e) => {
     e?.preventDefault();
     if (!aiChatInput.trim()) return;
@@ -527,11 +527,12 @@ function App() {
 ]
 `;
 
-    // 💡 v1 및 v1beta의 여러 표준 모델명을 유연하게 순차 호출하여 404 에러를 완벽히 해결합니다.
+    // 💡 구글 계정 상태에 따라 작동하는 최신 모델들을 순차적으로 호출하여 404 오류를 방지합니다.
     const candidateEndpoints = [
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
       "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-      "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
       "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
     ];
 
@@ -1264,14 +1265,6 @@ function App() {
 
   const closeDeptModal = () => setDeptModalStage(null);
 
-  const handleSaveKey = () => {
-    if (!keyInput.trim()) return;
-    const cleanKey = keyInput.trim();
-    localStorage.setItem("sp_anon_key", cleanKey);
-    setAnonKey(cleanKey);
-    setKeyModalOpen(false);
-  };
-
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-violet-50 via-white to-white p-4 pb-32 sm:p-6 sm:pb-36">
       <div className="mx-auto max-w-3xl">
@@ -1415,7 +1408,7 @@ function App() {
           <p className="text-[11px] text-slate-400">* 학년/부서가 미지정인 일정은 필터와 관계없이 항상 표시됩니다.</p>
         </div>
 
-        {/* ===== [위치: 담당 부서 필터 바로 밑] Gemini AI 자연어 간편 일정 등록 직사각형 채팅창 ===== */}
+        {/* ===== [위치: 담당 부서 필터 바로 밑] Gemini AI 자연어 간편 일정 및 관리자 근무 등록 채팅창 ===== */}
         <div className="mb-4 rounded-2xl bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 p-3.5 shadow-sm ring-1 ring-violet-200/70">
           <form onSubmit={handleAiSubmit} className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between px-1">
