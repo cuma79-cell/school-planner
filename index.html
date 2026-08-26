@@ -318,7 +318,7 @@ function App() {
 
   const [copiedEvent, setCopiedEvent] = useState(null);
 
-  // Gemini API 상태
+  // Gemini API 상태 (유지하되 API 입력 과정에서 에러나지 않도록 표준 v1beta 모델 적용)
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
   const [geminiKeyModalOpen, setGeminiKeyModalOpen] = useState(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
@@ -362,7 +362,7 @@ function App() {
   const [pwCheckInput, setPwCheckInput] = useState("");
   const [pwCheckError, setPwCheckError] = useState("");
 
-  // 관리자 근무 입력 모달 상태 (다중 동행 선택 포함)
+  // 관리자 근무 입력 모달 상태 (동행자 다중 선택 포함)
   const [adminModalStage, setAdminModalStage] = useState(null);
   const [adminTargetRole, setAdminTargetRole] = useState(null);
   const [adminTargetDate, setAdminTargetDate] = useState(ymd(today));
@@ -478,7 +478,7 @@ function App() {
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
-  // ==================== [Gemini 초고속 자연어 간편 등록 (안정형 v1beta 모델 통신)] ====================
+  // ==================== [Gemini 자연어 등록 핸들러 (v1beta 안정 통신)] ====================
   const handleAiSubmit = async (e) => {
     e?.preventDefault();
     if (!aiChatInput.trim()) return;
@@ -1189,7 +1189,6 @@ function App() {
           }
         });
       });
-      // 텍스트 박스에 직접 수정된 내용도 반영
       if (directText) {
         curData[adminTargetRole] = directText;
       }
@@ -1798,7 +1797,7 @@ function App() {
           </Modal>
         )}
 
-        {/* 7. 관리자 근무 현황 작성 및 다중 동행 등록 모달 */}
+        {/* 7. 관리자 근무 현황 작성 및 수정 모달 */}
         {adminModalStage === "edit" && (
           <Modal title={adminTargetRole && adminTargetRole !== 'ALL' ? `${adminTargetRole} 근무 현황 작성 및 수정` : `관리자 근무 현황 일괄 작성`} onClose={closeAdminModal} wide>
             {adminTargetRole && adminTargetRole !== 'ALL' ? (
