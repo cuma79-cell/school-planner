@@ -237,7 +237,6 @@ function DateRow({ date, today, events, isLast, onAddEvent, onOpenEvent, customH
     if (isASpecificAll && !isBSpecificAll) return -1;
     if (!isASpecificAll && isBSpecificAll) return 1;
 
-    // 둘 다 전체 행사이거나 둘 다 부서/학년일 경우 내용(content) 가나다순 정렬
     return (a.content || "").localeCompare(b.content || "", "ko");
   });
 
@@ -1679,7 +1678,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(getElementById('root')).render(<App />); // (참고: 빌드 시점 DOM 렌더링 유지)
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
