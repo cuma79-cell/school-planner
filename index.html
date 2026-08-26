@@ -478,7 +478,7 @@ function App() {
     }
   }, [adminTargetDate, weekKey, weekLabel]);
 
-  // ==================== [Gemini 초고속 자연어 간편 등록 (gemini-3.6-flash 대응)] ====================
+  // ==================== [Gemini 초고속 자연어 간편 등록 (안정형 v1beta 모델 통신)] ====================
   const handleAiSubmit = async (e) => {
     e?.preventDefault();
     if (!aiChatInput.trim()) return;
@@ -519,10 +519,7 @@ function App() {
     const cleanKey = geminiKey.trim();
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${cleanKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -532,11 +529,8 @@ function App() {
           contents: [
             { role: "user", parts: [{ text: `${systemPrompt}\n\n사용자 입력: "${aiChatInput}"` }] }
           ]
-        }),
-        signal: controller.signal
+        })
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
@@ -1071,7 +1065,6 @@ function App() {
     }
   };
 
-  // 관리자 근무 입력 모달 열기 (개별 또는 전체)
   const openAdminInput = (role = 'ALL') => {
     setAdminTargetRole(role);
     setAdminTargetDate(tab === "week" ? ymd(weekStart) : ymd(today));
@@ -1096,7 +1089,6 @@ function App() {
       });
       setAdminFormTexts(base);
     } else {
-      // 개별 카드를 클릭했을 때 기존에 저장된 내용을 텍스트박스에 로드
       const val = savedData[adminTargetRole];
       setAdminFormTexts({
         [adminTargetRole]: (val && val !== "특이사항 없음") ? val : ""
@@ -1165,7 +1157,6 @@ function App() {
       return;
     }
 
-    // 개별 직책 저장 처리 (임시 추가 항목들과 직접 입력창 항목을 모두 반영)
     let itemsToProcess = [...stagedAdminItems];
     if (adminCurrentInput.trim()) {
       const formatted = formatTextWithGivenDate(adminCurrentInput.trim(), adminTargetDate);
@@ -1182,14 +1173,11 @@ function App() {
       });
     }
 
-    // 직접 텍스트박스에 수정한 내용이 있다면 이를 우선 반영하거나 병합
     const directText = (adminFormTexts[adminTargetRole] || "").trim();
     
     if (itemsToProcess.length === 0) {
-      // 텍스트박스의 내용으로 직접 덮어쓰기 (전체 삭제 가능하도록 비우면 특이사항 없음)
       curData[adminTargetRole] = directText ? directText : "특이사항 없음";
     } else {
-      // 임시 추가된 항목들과 병합 처리
       const targetRoles = [adminTargetRole, ...Array.from(adminSharedRoles)];
       itemsToProcess.forEach(item => {
         targetRoles.forEach(r => {
@@ -1201,6 +1189,10 @@ function App() {
           }
         });
       });
+      // 텍스트 박스에 직접 수정된 내용도 반영
+      if (directText) {
+        curData[adminTargetRole] = directText;
+      }
     }
 
     updatedMap[targetWKey] = curData;
@@ -1767,7 +1759,7 @@ function App() {
               </div>
               <div>
                 <FieldLabel>행사 내용</FieldLabel>
-                <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={3} className={inputCls} placeholder="예) AI선도학교 동아리 활동(15:00~16:00, 진로활동실, 5~6학년 20명)" />
+                <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={3} className={inputCls} placeholder="예) 디지털새싹캠프(9:00~12:00, A1실, 5~6학년 10명)" />
               </div>
               {eventModal.mode === "add" ? (
                 <div>
